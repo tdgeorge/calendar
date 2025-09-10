@@ -72,12 +72,16 @@ class SlideshowApp:
                 # Image is taller than window
                 new_h = win_h
                 new_w = int(win_h * img_ratio)
-            image = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            self.photo = ImageTk.PhotoImage(image)
-            self.image_label.config(image=self.photo)
-            self.image_label.image = self.photo
-            self.current_image_index += 1
-            self.fullscreen_window.after(int(self.interval * 1000), self.display_next_image)
+            if new_w > 0 and new_h > 0:
+                image = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                self.photo = ImageTk.PhotoImage(image)
+                self.image_label.config(image=self.photo)
+                self.image_label.image = self.photo
+                self.current_image_index += 1
+                self.fullscreen_window.after(int(self.interval * 1000), self.display_next_image)
+            else:
+                # Try again after a short delay
+                self.fullscreen_window.after(100, self.display_next_image)
         else:
             self.current_image_index = 0
             self.display_next_image()
