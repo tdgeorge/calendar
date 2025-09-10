@@ -58,7 +58,10 @@ class SlideshowApp:
         if self.current_image_index < len(self.images):
             image_path = self.images[self.current_image_index]
             image = Image.open(image_path)
-            image = image.resize((self.fullscreen_window.winfo_width(), self.fullscreen_window.winfo_height()), Image.ANTIALIAS)
+            image = image.resize(
+                (self.fullscreen_window.winfo_width(), self.fullscreen_window.winfo_height()),
+                Image.Resampling.LANCZOS
+            )
             self.photo = ImageTk.PhotoImage(image)
             self.image_label.config(image=self.photo)
             self.image_label.image = self.photo
