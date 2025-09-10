@@ -58,25 +58,24 @@ class SlideshowApp:
         if self.current_image_index < len(self.images):
             image_path = self.images[self.current_image_index]
             image = Image.open(image_path)
-                # Maintain aspect ratio and best fit
-                win_w = self.fullscreen_window.winfo_width()
-                win_h = self.fullscreen_window.winfo_height()
-                img_w, img_h = image.size
-                win_ratio = win_w / win_h
-                img_ratio = img_w / img_h
-                if img_ratio > win_ratio:
-                    # Image is wider than window
-                    new_w = win_w
-                    new_h = int(win_w / img_ratio)
-                else:
-                    # Image is taller than window
-                    new_h = win_h
-                    new_w = int(win_h * img_ratio)
-                image = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            # Maintain aspect ratio and best fit
+            win_w = self.fullscreen_window.winfo_width()
+            win_h = self.fullscreen_window.winfo_height()
+            img_w, img_h = image.size
+            win_ratio = win_w / win_h
+            img_ratio = img_w / img_h
+            if img_ratio > win_ratio:
+                # Image is wider than window
+                new_w = win_w
+                new_h = int(win_w / img_ratio)
+            else:
+                # Image is taller than window
+                new_h = win_h
+                new_w = int(win_h * img_ratio)
+            image = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
             self.photo = ImageTk.PhotoImage(image)
             self.image_label.config(image=self.photo)
             self.image_label.image = self.photo
-            
             self.current_image_index += 1
             self.fullscreen_window.after(int(self.interval * 1000), self.display_next_image)
         else:
