@@ -8,6 +8,9 @@ let API_KEY = '';
 const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
 const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
 
+// Store events by date for color coding
+let eventsByDate = {};
+
 const loginBtn = document.getElementById('login-btn');
 const loginSection = document.getElementById('login-section');
 const calendarSection = document.getElementById('calendar-section');
@@ -16,6 +19,11 @@ const calendarTable = document.getElementById('calendar-table');
 const eventsDiv = document.getElementById('events');
 const debugOutput = document.getElementById('debug-output');
 const clearDebugBtn = document.getElementById('clear-debug');
+const prevMonthBtn = document.getElementById('prev-month');
+const nextMonthBtn = document.getElementById('next-month');
+
+// Current date being displayed
+let currentDisplayDate = new Date();
 
 // Debug logging function
 function debugLog(message, type = 'info') {
@@ -38,6 +46,23 @@ function debugLog(message, type = 'info') {
 // Clear debug console
 clearDebugBtn.onclick = () => {
     debugOutput.textContent = '';
+};
+
+// Navigation button handlers
+prevMonthBtn.onclick = () => {
+    currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1);
+    renderCalendar(currentDisplayDate);
+    if (accessToken) {
+        loadCalendarEventsForMonth(currentDisplayDate);
+    }
+};
+
+nextMonthBtn.onclick = () => {
+    currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1);
+    renderCalendar(currentDisplayDate);
+    if (accessToken) {
+        loadCalendarEventsForMonth(currentDisplayDate);
+    }
 };
 
 // Disable login button initially
@@ -96,7 +121,7 @@ function gapiLoaded() {
     gapi.load('client', initializeGapi);
 }
 
-function renderCalendar(date = new Date()) {
+function renderCalendar(date = currentDisplayDate) {
     const year = date.getFullYear();
     const month = date.getMonth();
     monthYear.textContent = date.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -110,7 +135,14 @@ function renderCalendar(date = new Date()) {
     for (let day = 1; day <= daysInMonth; day++) {
         const today = new Date();
         const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-        html += `<td class="${isToday ? 'today' : ''}">${day}</td>`;
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const hasEvents = eventsByDate[dateStr] && eventsByDate[dateStr].length > 0;
+        
+        let classes = [];
+        if (isToday) classes.push('today');
+        if (hasEvents) classes.push('has-events');
+        
+        html += `<td class="${classes.join(' ')}" data-date="${dateStr}" onclick="showDayEvents('${dateStr}')">${day}</td>`;
         if ((firstDay + day) % 7 === 0) html += '</tr><tr>';
     }
     html += '</tr>';
@@ -120,6 +152,7 @@ function renderCalendar(date = new Date()) {
 function showCalendar() {
     loginSection.style.display = 'none';
     calendarSection.style.display = 'block';
+    currentDisplayDate = new Date(); // Reset to current month when showing calendar
     renderCalendar();
 }
 
@@ -197,6 +230,7 @@ function gisLoaded() {
                 
                 debugLog('Token set on gapi.client, showing calendar');
                 showCalendar();
+                loadCalendarEvents();
                 listUpcomingEvents();
             },
         });
@@ -230,6 +264,7 @@ function handleAuthClick() {
     if (accessToken && gapi.client.getToken()) {
         debugLog('User already authenticated, showing calendar');
         showCalendar();
+        loadCalendarEvents();
         listUpcomingEvents();
         return;
     }
@@ -238,6 +273,69 @@ function handleAuthClick() {
     tokenClient.requestAccessToken({
         prompt: 'consent'
     });
+}
+
+async function loadCalendarEvents() {
+    return loadCalendarEventsForMonth(currentDisplayDate);
+}
+
+async function loadCalendarEventsForMonth(date) {
+    debugLog(`Loading calendar events for ${date.toLocaleString('default', { month: 'long', year: 'numeric' })}...`);
+    
+    // Check if we have an access token
+    if (!accessToken) {
+        debugLog('No access token available', 'error');
+        return;
+    }
+    
+    // Ensure the token is set on gapi.client
+    gapi.client.setToken({
+        access_token: accessToken
+    });
+    
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    
+    try {
+        const request = {
+            'calendarId': 'primary',
+            'timeMin': startOfMonth.toISOString(),
+            'timeMax': endOfMonth.toISOString(),
+            'showDeleted': false,
+            'singleEvents': true,
+            'orderBy': 'startTime'
+        };
+        
+        debugLog('Making Calendar API request for month events...');
+        const response = await gapi.client.calendar.events.list(request);
+        const events = response.result.items;
+        debugLog(`Found ${events.length} events for ${date.toLocaleString('default', { month: 'long', year: 'numeric' })}`);
+        
+        // Clear existing events for this month and add new ones
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        // Remove events from eventsByDate that belong to this month
+        Object.keys(eventsByDate).forEach(dateKey => {
+            if (dateKey.startsWith(monthKey)) {
+                delete eventsByDate[dateKey];
+            }
+        });
+        
+        // Add new events
+        events.forEach(event => {
+            const eventDate = event.start.date || event.start.dateTime.split('T')[0];
+            if (!eventsByDate[eventDate]) {
+                eventsByDate[eventDate] = [];
+            }
+            eventsByDate[eventDate].push(event);
+        });
+        
+        // Re-render calendar with event indicators
+        renderCalendar(date);
+        
+    } catch (err) {
+        debugLog(`Error loading calendar events: ${err.message}`, 'error');
+    }
 }
 
 async function listUpcomingEvents() {
@@ -262,7 +360,7 @@ async function listUpcomingEvents() {
             'timeMin': (new Date()).toISOString(),
             'showDeleted': false,
             'singleEvents': true,
-            'maxResults': 10,
+            'maxResults': 5,
             'orderBy': 'startTime'
         };
         
@@ -296,6 +394,28 @@ async function listUpcomingEvents() {
         eventsDiv.innerHTML = 'No upcoming events found.';
         debugLog('No upcoming events found');
     }
+}
+
+function showDayEvents(dateStr) {
+    debugLog(`Clicked on date: ${dateStr}`);
+    const dayEvents = eventsByDate[dateStr] || [];
+    
+    if (dayEvents.length === 0) {
+        eventsDiv.innerHTML = `<b>Events for ${dateStr}:</b><p>No events scheduled</p>`;
+        return;
+    }
+    
+    let html = `<b>Events for ${dateStr}:</b><ul>`;
+    dayEvents.forEach(event => {
+        const time = event.start.dateTime ? 
+            new Date(event.start.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
+            'All day';
+        html += `<li><strong>${time}</strong> - ${event.summary}`;
+        if (event.location) html += ` (${event.location})`;
+        html += `</li>`;
+    });
+    html += '</ul>';
+    eventsDiv.innerHTML = html;
 }
 
 function handleSignoutClick() {

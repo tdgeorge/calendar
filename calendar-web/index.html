@@ -12,7 +12,11 @@
     </div>
     <div id="calendar-section" style="display:none;">
         <button id="signout-btn" onclick="handleSignoutClick()">Sign Out</button>
-        <h2 id="month-year"></h2>
+        <div id="calendar-header">
+            <button id="prev-month" class="nav-btn">‹</button>
+            <h2 id="month-year"></h2>
+            <button id="next-month" class="nav-btn">›</button>
+        </div>
         <table id="calendar-table"></table>
         <div id="events"></div>
     </div>

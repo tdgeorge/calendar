@@ -29,6 +29,22 @@ body {
 #calendar-table td.today {
     background: #b3e5fc;
 }
+#calendar-table td.has-events {
+    background: #c8e6c9;
+    cursor: pointer;
+}
+#calendar-table td.has-events:hover {
+    background: #a5d6a7;
+}
+#calendar-table td.today.has-events {
+    background: #81c784;
+}
+@media (hover: none) {
+    /* Touch devices */
+    #calendar-table td.has-events:active {
+        background: #a5d6a7;
+    }
+}
 #login-section {
     text-align: center;
     margin-top: 60px;
@@ -87,4 +103,39 @@ body {
 }
 #clear-debug:hover {
     background: #555;
+}
+#calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+#calendar-header h2 {
+    margin: 0;
+    flex-grow: 1;
+    text-align: center;
+}
+.nav-btn {
+    background: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+.nav-btn:hover {
+    background: #357ae8;
+}
+.nav-btn:active {
+    background: #2c5aa0;
+}
+.nav-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
 }
