@@ -1459,6 +1459,226 @@ body {
     border: 2px dashed #ffffff;
 }
 
+/* Phase 4: Drag & Drop Styles */
+.draggable-event {
+    cursor: move;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+.draggable-event:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.dragging {
+    opacity: 0.8;
+    transform: rotate(2deg) scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    border: 2px dashed var(--accent-primary);
+    z-index: 9999;
+}
+
+.drag-active {
+    cursor: grabbing;
+}
+
+.drop-zone-active {
+    background: rgba(66, 133, 244, 0.1);
+    border: 1px dashed #4285f4;
+    transition: all 0.2s ease;
+}
+
+.drop-zone-hover {
+    background: rgba(66, 133, 244, 0.2) !important;
+    border: 2px solid #4285f4 !important;
+    box-shadow: 0 0 10px rgba(66, 133, 244, 0.3);
+    transform: scale(1.02);
+}
+
+/* Dark theme drag styles */
+[data-theme="dark"] .drop-zone-active {
+    background: rgba(66, 133, 244, 0.15);
+    border: 1px dashed #5294ff;
+}
+
+[data-theme="dark"] .drop-zone-hover {
+    background: rgba(66, 133, 244, 0.25) !important;
+    border: 2px solid #5294ff !important;
+    box-shadow: 0 0 10px rgba(82, 148, 255, 0.4);
+}
+
+/* Colorful theme drag styles */
+[data-theme="colorful"] .draggable-event:hover {
+    animation: rainbow-glow 1s ease infinite;
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="colorful"] .dragging {
+    animation: rainbow-pulse 0.5s ease infinite;
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
+    border: 2px dashed #ffffff;
+}
+
+[data-theme="colorful"] .drop-zone-active {
+    background: linear-gradient(45deg, rgba(255, 64, 129, 0.2), rgba(255, 171, 64, 0.2), rgba(212, 255, 128, 0.2));
+    background-size: 200% 200%;
+    animation: rainbow-bg 2s ease infinite;
+    border: 1px dashed #ffffff;
+}
+
+[data-theme="colorful"] .drop-zone-hover {
+    background: linear-gradient(45deg, rgba(255, 64, 129, 0.4), rgba(255, 171, 64, 0.4), rgba(212, 255, 128, 0.4)) !important;
+    background-size: 200% 200% !important;
+    animation: rainbow-bg 1s ease infinite !important;
+    border: 2px solid #ffffff !important;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.7);
+    transform: scale(1.02);
+}
+
+/* Additional drag animations */
+@keyframes rainbow-pulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+}
+
+/* Drag Helper Styles */
+.drag-helper {
+    background: var(--bg-primary);
+    border: 2px solid var(--accent-primary);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    font-size: 0.9rem;
+    max-width: 250px;
+    animation: dragHelperFloat 0.3s ease;
+}
+
+.drag-helper-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.drag-helper-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.drag-helper-time {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.drag-helper-instruction {
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    font-style: italic;
+    margin-top: 4px;
+}
+
+@keyframes dragHelperFloat {
+    0% {
+        opacity: 0;
+        transform: translateY(10px) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Dark theme drag helper */
+[data-theme="dark"] .drag-helper {
+    background: var(--bg-primary);
+    border: 2px solid var(--accent-secondary);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+}
+
+/* Colorful theme drag helper */
+[data-theme="colorful"] .drag-helper {
+    background: linear-gradient(135deg, rgba(255, 64, 129, 0.95), rgba(255, 171, 64, 0.95));
+    border: 2px solid #ffffff;
+    color: #ffffff;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+    animation: dragHelperFloat 0.3s ease, rainbow-glow 2s ease infinite;
+}
+
+[data-theme="colorful"] .drag-helper-title,
+[data-theme="colorful"] .drag-helper-time,
+[data-theme="colorful"] .drag-helper-instruction {
+    color: #ffffff;
+}
+
+/* Month view drop zone styles */
+td.drop-zone-active {
+    background: rgba(66, 133, 244, 0.15) !important;
+    border: 2px dashed #4285f4 !important;
+    position: relative;
+}
+
+td.drop-zone-hover {
+    background: rgba(66, 133, 244, 0.3) !important;
+    border: 3px solid #4285f4 !important;
+    box-shadow: inset 0 0 10px rgba(66, 133, 244, 0.4);
+    transform: scale(1.02);
+    z-index: 10;
+}
+
+/* Dark theme calendar drop zones */
+[data-theme="dark"] td.drop-zone-active {
+    background: rgba(66, 133, 244, 0.2) !important;
+    border: 2px dashed #5294ff !important;
+}
+
+[data-theme="dark"] td.drop-zone-hover {
+    background: rgba(66, 133, 244, 0.35) !important;
+    border: 3px solid #5294ff !important;
+    box-shadow: inset 0 0 10px rgba(82, 148, 255, 0.5);
+}
+
+/* Colorful theme calendar drop zones */
+[data-theme="colorful"] td.drop-zone-active {
+    background: linear-gradient(45deg, rgba(255, 64, 129, 0.2), rgba(255, 171, 64, 0.2)) !important;
+    border: 2px dashed #ffffff !important;
+    animation: rainbow-bg 2s ease infinite;
+}
+
+[data-theme="colorful"] td.drop-zone-hover {
+    background: linear-gradient(45deg, rgba(255, 64, 129, 0.4), rgba(255, 171, 64, 0.4)) !important;
+    border: 3px solid #ffffff !important;
+    animation: rainbow-bg 1s ease infinite;
+    box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.7);
+}
+
+/* Touch device improvements */
+@media (hover: none) {
+    .draggable-event {
+        cursor: default;
+    }
+    
+    .draggable-event:active {
+        transform: scale(0.98);
+    }
+    
+    .drop-zone-active {
+        background: rgba(66, 133, 244, 0.2);
+    }
+    
+    td.drop-zone-active {
+        background: rgba(66, 133, 244, 0.25) !important;
+        border: 2px dashed #4285f4 !important;
+    }
+    
+    .drag-helper {
+        font-size: 1rem;
+        padding: 16px 20px;
+    }
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
     .dashboard {

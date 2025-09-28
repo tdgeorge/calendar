@@ -11,6 +11,31 @@ const SCOPES = "https://www.googleapis.com/auth/calendar";
 // Store events by date for color coding
 let eventsByDate = {};
 
+// Global events array for drag & drop operations
+let allEvents = [];
+
+// Helper function to safely find event data
+function findEventById(eventId) {
+    // First try global allEvents array
+    let event = allEvents.find(e => e.id === eventId);
+    
+    // If not found, try window.currentEvents
+    if (!event && window.currentEvents) {
+        event = window.currentEvents.find(e => e.id === eventId);
+    }
+    
+    // If still not found, search in eventsByDate
+    if (!event) {
+        for (const dateKey in eventsByDate) {
+            const dayEvents = eventsByDate[dateKey];
+            event = dayEvents.find(e => e.id === eventId);
+            if (event) break;
+        }
+    }
+    
+    return event;
+}
+
 // Timezone-aware helper functions
 function formatDateForInput(dateString) {
     // For date inputs, we want YYYY-MM-DD in local timezone
@@ -531,13 +556,23 @@ function addWeekViewEventHandlers() {
         });
     });
     
-    // Add click handlers for existing events
+    // Add click handlers for existing events and make them draggable
     document.querySelectorAll('.week-event').forEach(eventEl => {
+        const eventId = eventEl.getAttribute('data-event-id');
+        
+        // Find the event data
+        const eventData = findEventById(eventId);
+        
+        // Make event draggable
+        makeEventDraggable(eventEl, eventId, eventData);
+        
+        // Add click handler (will only trigger if not dragging)
         eventEl.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const eventId = eventEl.getAttribute('data-event-id');
-            debugLog(`📅 Week event clicked: ${eventId}`);
-            editEvent(eventId);
+            if (!isDragging) {
+                e.stopPropagation();
+                debugLog(`📅 Week event clicked: ${eventId}`);
+                editEvent(eventId);
+            }
         });
     });
 }
@@ -705,13 +740,23 @@ function addDayViewEventHandlers() {
         });
     });
     
-    // Add click handlers for existing events
+    // Add click handlers for existing events and make them draggable
     document.querySelectorAll('.day-event').forEach(eventEl => {
+        const eventId = eventEl.getAttribute('data-event-id');
+        
+        // Find the event data
+        const eventData = findEventById(eventId);
+        
+        // Make event draggable
+        makeEventDraggable(eventEl, eventId, eventData);
+        
+        // Add click handler (will only trigger if not dragging)
         eventEl.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const eventId = eventEl.getAttribute('data-event-id');
-            debugLog(`📅 Day event clicked: ${eventId}`);
-            editEvent(eventId);
+            if (!isDragging) {
+                e.stopPropagation();
+                debugLog(`📅 Day event clicked: ${eventId}`);
+                editEvent(eventId);
+            }
         });
     });
 }
@@ -742,6 +787,23 @@ function createNewEventAtDayTime(dateStr, hour, minutes) {
     showEditForm(newEvent, true);
 }
 
+// Phase 4: Drag & Drop Event Management
+let isDragging = false;
+let draggedElement = null;
+let draggedEventId = null;
+let draggedEventData = null;
+let dragStartX = 0;
+let dragStartY = 0;
+let originalPosition = null;
+
+// Drag & Drop Configuration
+const DRAG_CONFIG = {
+    THRESHOLD: 5, // Minimum pixels to move before starting drag
+    SNAP_TO_GRID: true,
+    SHOW_DROP_ZONES: true,
+    AUTO_SCROLL: true
+};
+
 // Debug logging function
 function debugLog(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
@@ -758,6 +820,440 @@ function debugLog(message, type = 'info') {
     } else {
         console.log(message);
     }
+}
+
+// Drag & Drop Core Functions
+function initializeDragAndDrop() {
+    debugLog('🎯 Initializing drag & drop system');
+    
+    // Add global mouse event listeners
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+    document.addEventListener('dragstart', handleDragStart);
+    
+    // Prevent default drag behavior on images and other elements
+    document.addEventListener('dragstart', (e) => {
+        if (!e.target.classList.contains('draggable-event')) {
+            e.preventDefault();
+        }
+    });
+}
+
+function makeEventDraggable(eventElement, eventId, eventData) {
+    if (!eventElement || !eventId) {
+        debugLog(`⚠️ Skipping drag setup: missing element or eventId`, 'warn');
+        return;
+    }
+    
+    eventElement.classList.add('draggable-event');
+    eventElement.draggable = true;
+    eventElement.setAttribute('data-event-id', eventId);
+    
+    // Mouse down to start potential drag
+    eventElement.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        startDragOperation(e, eventElement, eventId, eventData);
+    });
+    
+    // Touch support for mobile
+    eventElement.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        const touch = e.touches[0];
+        startDragOperation(touch, eventElement, eventId, eventData);
+    });
+}
+
+function startDragOperation(e, element, eventId, eventData) {
+    debugLog(`🎯 Starting drag operation for event: ${eventId}`);
+    
+    draggedElement = element;
+    draggedEventId = eventId;
+    draggedEventData = eventData;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    
+    // Store original position
+    const rect = element.getBoundingClientRect();
+    originalPosition = {
+        x: rect.left,
+        y: rect.top,
+        parent: element.parentElement
+    };
+    
+    // Add dragging class for visual feedback
+    element.classList.add('dragging');
+    document.body.classList.add('drag-active');
+    
+    // Show drop zones if enabled
+    if (DRAG_CONFIG.SHOW_DROP_ZONES) {
+        highlightDropZones();
+    }
+    
+    // Create drag helper text
+    createDragHelper(eventData);
+}
+
+function handleGlobalMouseMove(e) {
+    if (!draggedElement) return;
+    
+    const deltaX = e.clientX - dragStartX;
+    const deltaY = e.clientY - dragStartY;
+    
+    // Check if we've moved enough to start dragging
+    if (!isDragging && (Math.abs(deltaX) > DRAG_CONFIG.THRESHOLD || Math.abs(deltaY) > DRAG_CONFIG.THRESHOLD)) {
+        isDragging = true;
+        debugLog('🎯 Drag threshold reached, starting drag');
+    }
+    
+    if (isDragging) {
+        // Move the element
+        draggedElement.style.position = 'fixed';
+        draggedElement.style.left = (originalPosition.x + deltaX) + 'px';
+        draggedElement.style.top = (originalPosition.y + deltaY) + 'px';
+        draggedElement.style.zIndex = '9999';
+        draggedElement.style.pointerEvents = 'none';
+        
+        // Update drag helper
+        updateDragHelper(e.clientX, e.clientY);
+        
+        // Highlight drop target
+        const dropTarget = getDropTargetAt(e.clientX, e.clientY);
+        updateDropHighlight(dropTarget);
+    }
+}
+
+function handleGlobalMouseUp(e) {
+    if (!draggedElement) return;
+    
+    if (isDragging) {
+        const dropTarget = getDropTargetAt(e.clientX, e.clientY);
+        
+        if (dropTarget) {
+            handleEventDrop(dropTarget);
+        } else {
+            // Reset to original position
+            resetDraggedElement();
+            showDragFeedback('❌ Invalid drop location', 'error');
+        }
+    }
+    
+    // Cleanup
+    cleanupDragOperation();
+}
+
+function getDropTargetAt(x, y) {
+    // Temporarily hide dragged element to get element underneath
+    const originalDisplay = draggedElement.style.display;
+    draggedElement.style.display = 'none';
+    
+    const elementBelow = document.elementFromPoint(x, y);
+    
+    // Restore dragged element
+    draggedElement.style.display = originalDisplay;
+    
+    if (!elementBelow) {
+        debugLog('🎯 No element found below cursor', 'warn');
+        return null;
+    }
+    
+    // Check if it's a valid drop zone
+    const timeSlot = elementBelow.closest('.time-slot, .day-time-slot');
+    if (timeSlot) {
+        debugLog('🎯 Found time slot drop target');
+        return timeSlot;
+    }
+    
+    // Check for month view calendar cells
+    const calendarCell = elementBelow.closest('td[data-date]');
+    if (calendarCell) {
+        debugLog(`🎯 Found calendar cell drop target with date: ${calendarCell.getAttribute('data-date')}`);
+        return calendarCell;
+    }
+    
+    // Also check if we're directly on a calendar cell (not just a child)
+    if (elementBelow.tagName === 'TD' && elementBelow.hasAttribute('data-date')) {
+        debugLog(`🎯 Found direct calendar cell drop target with date: ${elementBelow.getAttribute('data-date')}`);
+        return elementBelow;
+    }
+    
+    debugLog('🎯 No valid drop target found');
+    return null;
+}
+
+function handleEventDrop(dropTarget) {
+    debugLog(`🎯 Event dropped on: ${dropTarget.className}`);
+    
+    // Extract date and time information from drop target
+    const targetInfo = extractDropTargetInfo(dropTarget);
+    
+    if (targetInfo) {
+        // Update event with new time/date
+        updateEventDateTime(draggedEventId, targetInfo);
+    } else {
+        resetDraggedElement();
+    }
+}
+
+function extractDropTargetInfo(dropTarget) {
+    debugLog(`🎯 Extracting drop target info from: ${dropTarget.tagName} with classes: ${dropTarget.className}`);
+    
+    // Week view time slots
+    if (dropTarget.classList.contains('time-slot')) {
+        const dateStr = dropTarget.getAttribute('data-date');
+        const hour = parseInt(dropTarget.getAttribute('data-hour'));
+        debugLog(`🎯 Week view drop target: ${dateStr} at ${hour}:00`);
+        return { date: dateStr, hour: hour, view: 'week' };
+    }
+    
+    // Day view time slots
+    if (dropTarget.classList.contains('day-time-slot')) {
+        const dateStr = dropTarget.getAttribute('data-date');
+        const hour = parseInt(dropTarget.getAttribute('data-hour'));
+        const minutes = parseInt(dropTarget.getAttribute('data-minutes')) || 0;
+        debugLog(`🎯 Day view drop target: ${dateStr} at ${hour}:${minutes.toString().padStart(2, '0')}`);
+        return { date: dateStr, hour: hour, minutes: minutes, view: 'day' };
+    }
+    
+    // Month view - for all-day events
+    if (dropTarget.tagName === 'TD' && dropTarget.hasAttribute('data-date')) {
+        const dateStr = dropTarget.getAttribute('data-date');
+        debugLog(`🎯 Month view drop target: ${dateStr} (all-day)`);
+        return { date: dateStr, view: 'month', allDay: true };
+    }
+    
+    debugLog(`🎯 No valid drop target info found for: ${dropTarget.tagName}`);
+    return null;
+}
+
+async function updateEventDateTime(eventId, targetInfo) {
+    debugLog(`🎯 Updating event ${eventId} to ${targetInfo.date} at ${targetInfo.hour || 'all-day'}`);
+    
+    try {
+        // Find the event in our events array
+        const event = findEventById(eventId);
+        if (!event) {
+            debugLog(`❌ Event ${eventId} not found`, 'error');
+            resetDraggedElement();
+            return;
+        }
+        
+        // Create updated event data
+        const updatedEvent = { ...event };
+        
+        if (targetInfo.allDay) {
+            // Move to all-day event
+            updatedEvent.start = { date: targetInfo.date };
+            updatedEvent.end = { date: targetInfo.date };
+        } else {
+            // Move to specific time
+            const startTime = `${String(targetInfo.hour).padStart(2, '0')}:${String(targetInfo.minutes || 0).padStart(2, '0')}:00`;
+            const endHour = (targetInfo.hour || 0) + 1;
+            const endTime = `${String(endHour).padStart(2, '0')}:${String(targetInfo.minutes || 0).padStart(2, '0')}:00`;
+            
+            updatedEvent.start = { 
+                dateTime: `${targetInfo.date}T${startTime}`,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+            updatedEvent.end = { 
+                dateTime: `${targetInfo.date}T${endTime}`,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+        }
+        
+        // Update via Google Calendar API
+        if (accessToken) {
+            const response = await gapi.client.calendar.events.update({
+                calendarId: 'primary',
+                eventId: eventId,
+                resource: updatedEvent
+            });
+            
+            debugLog(`✅ Event updated successfully`);
+            
+            // Show success feedback
+            showDragFeedback('✅ Event moved successfully!', 'success');
+            
+            // Refresh the current view
+            await loadCalendarEventsForMonth(currentDisplayDate);
+            renderCurrentView();
+            
+            // Switch events panel to show the dropped day's events
+            if (targetInfo.date) {
+                debugLog(`📅 Switching events panel to show events for ${targetInfo.date}`);
+                showDayEvents(targetInfo.date);
+            }
+            
+        } else {
+            debugLog(`❌ No access token available`, 'error');
+            resetDraggedElement();
+        }
+        
+    } catch (error) {
+        debugLog(`❌ Error updating event: ${error.message}`, 'error');
+        resetDraggedElement();
+    }
+}
+
+function resetDraggedElement() {
+    if (draggedElement && originalPosition) {
+        draggedElement.style.position = '';
+        draggedElement.style.left = '';
+        draggedElement.style.top = '';
+        draggedElement.style.zIndex = '';
+        draggedElement.style.pointerEvents = '';
+    }
+}
+
+function cleanupDragOperation() {
+    if (draggedElement) {
+        draggedElement.classList.remove('dragging');
+        draggedElement = null;
+    }
+    
+    document.body.classList.remove('drag-active');
+    isDragging = false;
+    draggedEventId = null;
+    draggedEventData = null;
+    originalPosition = null;
+    
+    // Clear drop zone highlights
+    clearDropZoneHighlights();
+    
+    // Remove drag helper
+    removeDragHelper();
+}
+
+function highlightDropZones() {
+    // Highlight valid drop zones based on current view
+    if (currentViewMode === VIEW_MODES.WEEK) {
+        document.querySelectorAll('.time-slot').forEach(slot => {
+            slot.classList.add('drop-zone-active');
+        });
+    } else if (currentViewMode === VIEW_MODES.DAY) {
+        document.querySelectorAll('.day-time-slot').forEach(slot => {
+            slot.classList.add('drop-zone-active');
+        });
+    } else if (currentViewMode === VIEW_MODES.MONTH) {
+        document.querySelectorAll('#calendar-table td[data-date], td[data-date]').forEach(cell => {
+            cell.classList.add('drop-zone-active');
+        });
+        debugLog(`🎯 Highlighted ${document.querySelectorAll('td[data-date]').length} calendar cells as drop zones`);
+    }
+}
+
+function clearDropZoneHighlights() {
+    document.querySelectorAll('.drop-zone-active, .drop-zone-hover').forEach(element => {
+        element.classList.remove('drop-zone-active', 'drop-zone-hover');
+    });
+}
+
+function updateDropHighlight(dropTarget) {
+    // Clear previous highlights
+    document.querySelectorAll('.drop-zone-hover').forEach(element => {
+        element.classList.remove('drop-zone-hover');
+    });
+    
+    // Highlight current drop target
+    if (dropTarget) {
+        dropTarget.classList.add('drop-zone-hover');
+    }
+}
+
+function handleDragStart(e) {
+    // Custom drag start handling if needed
+    if (!e.target.classList.contains('draggable-event')) {
+        e.preventDefault();
+        return;
+    }
+}
+
+// Helper functions for enhanced user experience
+function createDragHelper(eventData) {
+    const helper = document.createElement('div');
+    helper.id = 'drag-helper';
+    helper.className = 'drag-helper';
+    
+    const eventTitle = eventData && eventData.summary ? eventData.summary : 'Event';
+    let eventTime = 'All day';
+    
+    if (eventData && eventData.start) {
+        if (eventData.start.dateTime) {
+            eventTime = formatTimeForInput(eventData.start.dateTime);
+        } else if (eventData.start.date) {
+            eventTime = 'All day';
+        }
+    }
+    
+    const instruction = currentViewMode === VIEW_MODES.MONTH ? 
+        'Drop on calendar date to reschedule' : 
+        'Drop on time slot to reschedule';
+    
+    helper.innerHTML = `
+        <div class="drag-helper-content">
+            <div class="drag-helper-title">📅 ${eventTitle}</div>
+            <div class="drag-helper-time">🕐 ${eventTime}</div>
+            <div class="drag-helper-instruction">${instruction}</div>
+        </div>
+    `;
+    
+    helper.style.position = 'fixed';
+    helper.style.pointerEvents = 'none';
+    helper.style.zIndex = '10000';
+    helper.style.display = 'none';
+    
+    document.body.appendChild(helper);
+}
+
+function updateDragHelper(x, y) {
+    const helper = document.getElementById('drag-helper');
+    if (helper && isDragging) {
+        helper.style.left = (x + 15) + 'px';
+        helper.style.top = (y + 15) + 'px';
+        helper.style.display = 'block';
+    }
+}
+
+function removeDragHelper() {
+    const helper = document.getElementById('drag-helper');
+    if (helper) {
+        helper.remove();
+    }
+}
+
+function showDragFeedback(message, type = 'info') {
+    const feedback = document.createElement('div');
+    feedback.className = `drag-feedback drag-feedback-${type}`;
+    feedback.textContent = message;
+    
+    feedback.style.position = 'fixed';
+    feedback.style.top = '20px';
+    feedback.style.right = '20px';
+    feedback.style.padding = '12px 20px';
+    feedback.style.borderRadius = '8px';
+    feedback.style.zIndex = '10001';
+    feedback.style.fontWeight = '500';
+    feedback.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+    
+    if (type === 'success') {
+        feedback.style.background = '#10b981';
+        feedback.style.color = 'white';
+    } else if (type === 'error') {
+        feedback.style.background = '#ef4444';
+        feedback.style.color = 'white';
+    } else {
+        feedback.style.background = 'var(--bg-secondary)';
+        feedback.style.color = 'var(--text-primary)';
+        feedback.style.border = '1px solid var(--border-primary)';
+    }
+    
+    document.body.appendChild(feedback);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        if (feedback && feedback.parentNode) {
+            feedback.remove();
+        }
+    }, 3000);
 }
 
 // Clear debug console
@@ -1212,6 +1708,9 @@ async function loadCalendarEventsForMonth(date) {
             }
         });
         
+        // Clear and update global events array for drag & drop
+        allEvents = [...events];
+        
         // Add new events with proper timezone handling
         events.forEach(event => {
             let eventDate;
@@ -1287,9 +1786,15 @@ async function listUpcomingEvents() {
         let html = '<b>Upcoming Events:</b><ul>';
         events.forEach((event, index) => {
             // Use timezone-aware formatting for consistent display
-            const eventDate = event.start.date ? 
-                new Date(event.start.date + 'T00:00:00').toLocaleDateString() :
-                new Date(event.start.dateTime).toLocaleDateString();
+            let eventDate;
+            if (event.start.date) {
+                // All-day event - parse as local date to avoid timezone shifts
+                const [year, month, day] = event.start.date.split('-').map(Number);
+                eventDate = new Date(year, month - 1, day).toLocaleDateString();
+            } else {
+                // Timed event - use the dateTime as-is
+                eventDate = new Date(event.start.dateTime).toLocaleDateString();
+            }
             const eventTime = event.start.dateTime ? 
                 formatTimeForInput(event.start.dateTime) : 
                 'All day';
@@ -1305,8 +1810,14 @@ async function listUpcomingEvents() {
         html += '</ul>';
         eventsDiv.innerHTML = html;
         
-        // Store events for editing
+        // Store events for editing and drag & drop
         window.currentEvents = events;
+        // Update global events array (merge with existing to avoid losing other events)
+        events.forEach(event => {
+            if (!allEvents.find(e => e.id === event.id)) {
+                allEvents.push(event);
+            }
+        });
         debugLog(`Displayed ${events.length} events`);
     } else {
         eventsDiv.innerHTML = 'No upcoming events found.';
@@ -1357,7 +1868,9 @@ function showDayEvents(dateStr) {
         html += `<ul>`;
         dayEvents.forEach(event => {
             // Format date and time in local timezone
-            const displayDate = new Date(dateStr).toLocaleDateString();
+            // Parse dateStr as local date to avoid timezone shifts
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const displayDate = new Date(year, month - 1, day).toLocaleDateString();
             const eventTime = event.start.dateTime ? 
                 formatTimeForInput(event.start.dateTime) : 
                 'All day';
@@ -1819,9 +2332,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const eventItem = e.target.closest('.event-item[data-event-id]');
         if (eventItem) {
-            const eventId = eventItem.getAttribute('data-event-id');
-            debugLog(`🎯 Event item clicked via delegation: ${eventId}`);
-            editEvent(eventId);
+            // Only handle click if we're not in the middle of a drag operation
+            if (!isDragging) {
+                const eventId = eventItem.getAttribute('data-event-id');
+                debugLog(`🎯 Event item clicked via delegation: ${eventId}`);
+                editEvent(eventId);
+            }
         } else {
             // Check if click was on event-related element
             if (e.target.classList.contains('event-item') || e.target.closest('.event-item')) {
@@ -1830,6 +2346,40 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+    
+    // Make event items in events panel draggable when they're added
+    const eventsContainer = document.getElementById('events');
+    if (eventsContainer) {
+        // Use MutationObserver to detect when new event items are added
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1) { // Element node
+                            // Make new event items draggable
+                            const eventItems = node.querySelectorAll ? node.querySelectorAll('.event-item[data-event-id]') : [];
+                            eventItems.forEach(eventItem => {
+                                const eventId = eventItem.getAttribute('data-event-id');
+                                const eventData = findEventById(eventId);
+                                makeEventDraggable(eventItem, eventId, eventData);
+                            });
+                            
+                            // Also check if the node itself is an event item
+                            if (node.classList && node.classList.contains('event-item')) {
+                                const eventId = node.getAttribute('data-event-id');
+                                if (eventId) {
+                                    const eventData = findEventById(eventId);
+                                    makeEventDraggable(node, eventId, eventData);
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        
+        observer.observe(eventsContainer, { childList: true, subtree: true });
+    }
     
     // All-day checkbox toggle
     document.getElementById('edit-all-day').addEventListener('change', (e) => {
@@ -1870,6 +2420,13 @@ function toggleDebugConsole() {
         icon.textContent = '▼';
     }
 }
+
+// Initialize drag and drop system
+initializeDragAndDrop();
+
+// Initialize events arrays
+allEvents = [];
+window.currentEvents = [];
 
 // Show calendar for non-logged-in users (demo only)
 renderCurrentView();
