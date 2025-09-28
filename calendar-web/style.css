@@ -156,6 +156,11 @@ body {
     font-weight: 600;
     color: var(--text-primary);
     letter-spacing: -0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    font-variant-numeric: tabular-nums; /* Better number alignment for time */
 }
 
 .header-actions {
@@ -646,6 +651,10 @@ body {
     border-bottom: none;
 }
 
+[data-theme="dark"] .day-time-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .day-time-label {
     background: var(--bg-secondary);
     display: flex;
@@ -679,6 +688,19 @@ body {
     background: var(--border-secondary);
 }
 
+/* Dark theme improvements for day view borders */
+body.dark .day-time-label.full {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+body.dark .day-time-label.half {
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+body.dark .day-time-label.half::before {
+    background: rgba(255, 255, 255, 0.08);
+}
+
 .day-time-slot {
     position: relative;
     background: var(--bg-primary);
@@ -689,7 +711,9 @@ body {
 }
 
 .day-time-slot:hover {
-    background: var(--button-hover);
+    background: var(--accent-hover);
+    border: 2px solid var(--accent-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .day-time-slot:nth-child(even) {
@@ -698,6 +722,12 @@ body {
 
 [data-theme="dark"] .day-time-slot:nth-child(even) {
     background: rgba(255, 255, 255, 0.02);
+}
+
+[data-theme="dark"] .day-time-slot:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Day Event Styles */
@@ -1810,6 +1840,11 @@ td.drop-zone-hover {
         gap: 1rem;
     }
     
+    .app-title {
+        font-size: 1.3rem;
+        letter-spacing: -0.3px;
+    }
+    
     /* Mobile view switcher */
     .view-switcher {
         display: flex;
@@ -1938,7 +1973,8 @@ td.drop-zone-hover {
 @media (max-width: 480px) {
     /* Phase 5: Ultra-mobile optimizations */
     .app-title {
-        font-size: 1.1rem;
+        font-size: 1rem;
+        letter-spacing: -0.25px;
     }
     
     .btn, #login-btn {

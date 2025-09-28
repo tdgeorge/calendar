@@ -131,6 +131,7 @@ function applyTheme(theme) {
     setTimeout(() => {
         updateCurrentTimeLine();  // Refresh current time indicator with new theme
         updateViewSwitcher();     // Refresh view switcher appearance
+        updateHeaderClock();      // Refresh header clock to apply theme styling
     }, 50);
 }
 
@@ -809,6 +810,7 @@ let originalPosition = null;
 
 // Phase 5: Polish & Integration
 let currentTimeLineInterval = null;
+let headerClockInterval = null;
 
 // Drag & Drop Configuration
 const DRAG_CONFIG = {
@@ -2634,6 +2636,56 @@ function isViewingCurrentDay() {
     return false;
 }
 
+// Header Clock Functions
+function initializeHeaderClock() {
+    debugLog('🕐 Initializing header clock');
+    
+    // Update immediately and then every minute
+    updateHeaderClock();
+    
+    // Clear any existing interval
+    if (headerClockInterval) {
+        clearInterval(headerClockInterval);
+    }
+    
+    // Update every minute (60000ms)
+    headerClockInterval = setInterval(updateHeaderClock, 60000);
+}
+
+function updateHeaderClock() {
+    const headerTitle = document.querySelector('.app-title');
+    if (headerTitle) {
+        const now = new Date();
+        const dateTimeString = formatHeaderDateTime(now);
+        headerTitle.textContent = dateTimeString;
+        debugLog(`🕐 Updated header clock: ${dateTimeString}`);
+    }
+}
+
+function formatHeaderDateTime(date) {
+    // Format: "September 28, 2025 • 10:45 PM"
+    const options = { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric'
+    };
+    
+    const dateStr = date.toLocaleDateString('en-US', options);
+    
+    // Format time with AM/PM
+    let hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12; // 0 should be 12
+    
+    const minutesStr = minutes.toString().padStart(2, '0');
+    const timeStr = `${hours}:${minutesStr} ${ampm}`;
+    
+    return `${dateStr} • ${timeStr}`;
+}
+
 // Initialize drag and drop system
 initializeDragAndDrop();
 
@@ -2644,10 +2696,16 @@ window.currentEvents = [];
 // Phase 5: Initialize current time indicator
 initializeCurrentTimeIndicator();
 
+// Phase 5: Initialize header clock
+initializeHeaderClock();
+
 // Phase 5: Cleanup on page unload
 window.addEventListener('beforeunload', () => {
     if (currentTimeLineInterval) {
         clearInterval(currentTimeLineInterval);
+    }
+    if (headerClockInterval) {
+        clearInterval(headerClockInterval);
     }
 });
 
