@@ -129,7 +129,7 @@ function activateSecretTheme() {
     debugLog('🌈✨ Secret colorful theme activated!');
 }
 
-// Initialize theme
+// Initialize theme and view mode
 function initializeTheme() {
     const savedTheme = getThemeFromStorage();
     applyTheme(savedTheme);
@@ -150,6 +150,31 @@ function initializeTheme() {
     } else {
         debugLog('❌ Theme toggle button not found', 'error');
     }
+}
+
+function initializeViewMode() {
+    const savedView = getViewFromStorage();
+    currentViewMode = savedView;
+    
+    // Add event listeners for view switcher buttons
+    const monthBtn = document.getElementById('view-month');
+    const weekBtn = document.getElementById('view-week');
+    const dayBtn = document.getElementById('view-day');
+    
+    if (monthBtn) {
+        monthBtn.addEventListener('click', () => setViewMode(VIEW_MODES.MONTH));
+    }
+    if (weekBtn) {
+        weekBtn.addEventListener('click', () => setViewMode(VIEW_MODES.WEEK));
+    }
+    if (dayBtn) {
+        dayBtn.addEventListener('click', () => setViewMode(VIEW_MODES.DAY));
+    }
+    
+    // Initialize view switcher UI
+    updateViewSwitcher();
+    
+    debugLog(`📅 View mode initialized: ${savedView}`);
 }
 
 // DOM element references with null checks
@@ -185,6 +210,155 @@ const nextMonthBtn = getElement('next-month');
 // Current date being displayed
 let currentDisplayDate = new Date();
 
+// View mode management
+const VIEW_MODES = {
+    MONTH: 'month',
+    WEEK: 'week',
+    DAY: 'day'
+};
+
+let currentViewMode = VIEW_MODES.MONTH;
+const VIEW_STORAGE_KEY = 'calendar_view_preference';
+
+// View mode management functions
+function getViewFromStorage() {
+    try {
+        return localStorage.getItem(VIEW_STORAGE_KEY) || VIEW_MODES.MONTH;
+    } catch (error) {
+        debugLog(`Failed to get view from localStorage: ${error.message}`, 'warn');
+        return VIEW_MODES.MONTH;
+    }
+}
+
+function saveViewToStorage(viewMode) {
+    try {
+        localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
+        debugLog(`✅ View mode saved to localStorage: ${viewMode}`);
+    } catch (error) {
+        debugLog(`❌ Failed to save view mode to localStorage: ${error.message}`, 'error');
+    }
+}
+
+function setViewMode(newMode) {
+    if (!Object.values(VIEW_MODES).includes(newMode)) {
+        debugLog(`❌ Invalid view mode: ${newMode}`, 'error');
+        return;
+    }
+    
+    const oldMode = currentViewMode;
+    currentViewMode = newMode;
+    saveViewToStorage(newMode);
+    
+    debugLog(`📅 View mode changed from ${oldMode} to ${newMode}`);
+    
+    // Update UI to reflect new view mode
+    updateViewSwitcher();
+    renderCurrentView();
+}
+
+function updateViewSwitcher() {
+    const monthBtn = document.getElementById('view-month');
+    const weekBtn = document.getElementById('view-week');
+    const dayBtn = document.getElementById('view-day');
+    
+    // Remove active class from all buttons
+    [monthBtn, weekBtn, dayBtn].forEach(btn => {
+        if (btn) btn.classList.remove('active');
+    });
+    
+    // Add active class to current view button
+    switch (currentViewMode) {
+        case VIEW_MODES.MONTH:
+            if (monthBtn) monthBtn.classList.add('active');
+            break;
+        case VIEW_MODES.WEEK:
+            if (weekBtn) weekBtn.classList.add('active');
+            break;
+        case VIEW_MODES.DAY:
+            if (dayBtn) dayBtn.classList.add('active');
+            break;
+    }
+}
+
+function renderCurrentView() {
+    debugLog(`🖼️ Rendering ${currentViewMode} view`);
+    
+    switch (currentViewMode) {
+        case VIEW_MODES.MONTH:
+            renderMonthView();
+            break;
+        case VIEW_MODES.WEEK:
+            renderWeekView();
+            break;
+        case VIEW_MODES.DAY:
+            renderDayView();
+            break;
+        default:
+            debugLog(`❌ Unknown view mode: ${currentViewMode}`, 'error');
+            renderMonthView(); // Fallback to month view
+    }
+}
+
+// Wrapper function for existing month view rendering
+function renderMonthView() {
+    debugLog('📅 Rendering month view');
+    renderCalendar(currentDisplayDate);
+    updateHeaderText();
+}
+
+function updateHeaderText() {
+    if (!monthYear) return;
+    
+    const options = { year: 'numeric' };
+    
+    switch (currentViewMode) {
+        case VIEW_MODES.MONTH:
+            options.month = 'long';
+            monthYear.textContent = currentDisplayDate.toLocaleDateString('default', options);
+            break;
+        case VIEW_MODES.WEEK:
+            const weekStart = getWeekStart(currentDisplayDate);
+            const weekEnd = getWeekEnd(currentDisplayDate);
+            if (weekStart.getMonth() === weekEnd.getMonth()) {
+                monthYear.textContent = `${weekStart.toLocaleDateString('default', { month: 'long', year: 'numeric' })}, Week of ${weekStart.getDate()}-${weekEnd.getDate()}`;
+            } else {
+                monthYear.textContent = `${weekStart.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+            }
+            break;
+        case VIEW_MODES.DAY:
+            options.month = 'long';
+            options.day = 'numeric';
+            options.weekday = 'long';
+            monthYear.textContent = currentDisplayDate.toLocaleDateString('default', options);
+            break;
+    }
+}
+
+function getWeekStart(date) {
+    const start = new Date(date);
+    start.setDate(date.getDate() - date.getDay()); // Sunday
+    return start;
+}
+
+function getWeekEnd(date) {
+    const end = new Date(date);
+    end.setDate(date.getDate() + (6 - date.getDay())); // Saturday
+    return end;
+}
+
+// Placeholder functions for week and day views (to be implemented)
+function renderWeekView() {
+    debugLog('📊 Rendering week view (placeholder)');
+    // TODO: Implement week view rendering
+    renderCalendar(currentDisplayDate); // Temporary fallback
+}
+
+function renderDayView() {
+    debugLog('📋 Rendering day view (placeholder)');
+    // TODO: Implement day view rendering
+    renderCalendar(currentDisplayDate); // Temporary fallback
+}
+
 // Debug logging function
 function debugLog(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
@@ -210,25 +384,59 @@ if (clearDebugBtn && debugOutput) {
     };
 }
 
-// Navigation button handlers
+// Navigation button handlers - updated to work with view modes
 if (prevMonthBtn) {
     prevMonthBtn.onclick = () => {
-        currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1);
-        renderCalendar(currentDisplayDate);
-        if (accessToken) {
-            loadCalendarEventsForMonth(currentDisplayDate);
-        }
+        navigatePrevious();
     };
 }
 
 if (nextMonthBtn) {
     nextMonthBtn.onclick = () => {
-        currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1);
-        renderCalendar(currentDisplayDate);
-        if (accessToken) {
-            loadCalendarEventsForMonth(currentDisplayDate);
-        }
+        navigateNext();
     };
+}
+
+function navigatePrevious() {
+    switch (currentViewMode) {
+        case VIEW_MODES.MONTH:
+            currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1);
+            break;
+        case VIEW_MODES.WEEK:
+            currentDisplayDate.setDate(currentDisplayDate.getDate() - 7);
+            break;
+        case VIEW_MODES.DAY:
+            currentDisplayDate.setDate(currentDisplayDate.getDate() - 1);
+            break;
+    }
+    
+    renderCurrentView();
+    if (accessToken) {
+        loadCalendarEventsForMonth(currentDisplayDate);
+    }
+    
+    debugLog(`🔙 Navigated to previous ${currentViewMode}: ${currentDisplayDate.toDateString()}`);
+}
+
+function navigateNext() {
+    switch (currentViewMode) {
+        case VIEW_MODES.MONTH:
+            currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1);
+            break;
+        case VIEW_MODES.WEEK:
+            currentDisplayDate.setDate(currentDisplayDate.getDate() + 7);
+            break;
+        case VIEW_MODES.DAY:
+            currentDisplayDate.setDate(currentDisplayDate.getDate() + 1);
+            break;
+    }
+    
+    renderCurrentView();
+    if (accessToken) {
+        loadCalendarEventsForMonth(currentDisplayDate);
+    }
+    
+    debugLog(`▶️ Navigated to next ${currentViewMode}: ${currentDisplayDate.toDateString()}`);
 }
 
 // Initialize login button and UI state
@@ -239,8 +447,9 @@ if (loginSection) loginSection.style.display = 'block';
 if (userSection) userSection.style.display = 'none';
 if (dashboard) dashboard.style.display = 'none';
 
-// Initialize theme
+// Initialize theme and view mode
 initializeTheme();
+initializeViewMode();
 
 debugLog('Calendar app initialized');
 
@@ -336,7 +545,7 @@ async function showCalendar() {
     if (userSection) userSection.style.display = 'flex';
     if (dashboard) dashboard.style.display = 'grid';
     currentDisplayDate = new Date(); // Reset to current month when showing calendar
-    renderCalendar();
+    renderCurrentView(); // Use the new view system instead of direct renderCalendar
     
     // Load events for calendar coloring and initial display
     if (accessToken) {

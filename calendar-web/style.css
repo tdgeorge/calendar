@@ -327,6 +327,46 @@ body {
     color: #4a5568;
 }
 
+/* View Switcher */
+.view-switcher {
+    display: flex;
+    gap: 0;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-primary);
+}
+
+.view-btn {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.view-btn:hover {
+    background: var(--button-hover);
+    color: var(--text-primary);
+}
+
+.view-btn.active {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    box-shadow: 0 2px 4px var(--shadow-light);
+}
+
+.view-btn.active:hover {
+    background: var(--accent-hover);
+}
+
 /* Calendar Styles */
 .calendar-container {
     padding: 1.5rem;
@@ -953,6 +993,35 @@ body {
     color: #ffffff !important;
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
     font-weight: bold;
+}
+
+[data-theme="colorful"] .view-switcher {
+    background: linear-gradient(45deg, rgba(255, 64, 129, 0.8), rgba(255, 171, 64, 0.8), rgba(212, 255, 128, 0.8)) !important;
+    background-size: 300% 300%;
+    animation: rainbow-bg 3s ease infinite;
+    border: 2px solid;
+    border-image: linear-gradient(90deg, #ff4081, #ffab40, #d4ff80) 1;
+}
+
+[data-theme="colorful"] .view-btn {
+    color: #000000 !important;
+    font-weight: bold;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="colorful"] .view-btn.active {
+    background: linear-gradient(45deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff, #06ffa5) !important;
+    background-size: 400% 400%;
+    animation: rainbow-bg 2s ease infinite;
+    color: #ffffff !important;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+    border: 1px solid #ffffff;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="colorful"] .view-btn:hover {
+    animation: rainbow-glow 1s ease infinite;
+    transform: scale(1.05);
 }
 
 /* Responsive Design */
