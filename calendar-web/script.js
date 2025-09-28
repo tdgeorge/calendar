@@ -289,18 +289,23 @@ function renderCurrentView() {
     
     switch (currentViewMode) {
         case VIEW_MODES.MONTH:
+            debugLog('📅 Calling renderMonthView()');
             renderMonthView();
             break;
         case VIEW_MODES.WEEK:
+            debugLog('📊 Calling renderWeekView()');
             renderWeekView();
             break;
         case VIEW_MODES.DAY:
+            debugLog('📋 Calling renderDayView()');
             renderDayView();
             break;
         default:
             debugLog(`❌ Unknown view mode: ${currentViewMode}`, 'error');
             renderMonthView(); // Fallback to month view
     }
+    
+    debugLog(`✅ Finished rendering ${currentViewMode} view`);
 }
 
 function updatePanelVisibility() {
@@ -564,7 +569,17 @@ function createNewEventAtTime(dateStr, hour) {
 function renderDayView() {
     debugLog('📋 Rendering day view (placeholder)');
     // TODO: Implement day view rendering
-    renderCalendar(currentDisplayDate); // Temporary fallback
+    // For now, just show a placeholder message instead of falling back to month view
+    if (calendarTable) {
+        calendarTable.innerHTML = `
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                <h3>Day View</h3>
+                <p>Day view implementation coming soon!</p>
+                <p>Current date: ${currentDisplayDate.toLocaleDateString()}</p>
+            </div>
+        `;
+    }
+    updateHeaderText();
 }
 
 // Debug logging function
@@ -608,6 +623,8 @@ if (nextMonthBtn) {
 function navigatePrevious() {
     const originalViewMode = currentViewMode; // Preserve view mode
     
+    debugLog(`🔙 Navigation started in ${currentViewMode} mode`);
+    
     switch (currentViewMode) {
         case VIEW_MODES.MONTH:
             currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1);
@@ -623,16 +640,20 @@ function navigatePrevious() {
     // Ensure view mode is preserved
     currentViewMode = originalViewMode;
     
+    debugLog(`🔙 About to render ${currentViewMode} view`);
     renderCurrentView();
+    
     if (accessToken) {
         loadCalendarEventsForMonth(currentDisplayDate);
     }
     
-    debugLog(`🔙 Navigated to previous ${currentViewMode}: ${currentDisplayDate.toDateString()}`);
+    debugLog(`🔙 Navigation complete - still in ${currentViewMode}: ${currentDisplayDate.toDateString()}`);
 }
 
 function navigateNext() {
     const originalViewMode = currentViewMode; // Preserve view mode
+    
+    debugLog(`▶️ Navigation started in ${currentViewMode} mode`);
     
     switch (currentViewMode) {
         case VIEW_MODES.MONTH:
@@ -649,12 +670,14 @@ function navigateNext() {
     // Ensure view mode is preserved
     currentViewMode = originalViewMode;
     
+    debugLog(`▶️ About to render ${currentViewMode} view`);
     renderCurrentView();
+    
     if (accessToken) {
         loadCalendarEventsForMonth(currentDisplayDate);
     }
     
-    debugLog(`▶️ Navigated to next ${currentViewMode}: ${currentDisplayDate.toDateString()}`);
+    debugLog(`▶️ Navigation complete - still in ${currentViewMode}: ${currentDisplayDate.toDateString()}`);
 }
 
 // Initialize login button and UI state
@@ -1047,8 +1070,8 @@ async function loadCalendarEventsForMonth(date) {
             eventsByDate[eventDate].push(event);
         });
         
-        // Re-render calendar with event indicators
-        renderCalendar(date);
+        // Re-render current view with event indicators
+        renderCurrentView();
         
     } catch (err) {
         debugLog(`Error loading calendar events: ${err.message}`, 'error');
@@ -1689,4 +1712,4 @@ function toggleDebugConsole() {
 }
 
 // Show calendar for non-logged-in users (demo only)
-renderCalendar();
+renderCurrentView();
