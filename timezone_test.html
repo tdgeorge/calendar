@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timezone Helper Functions Test</title>
+</head>
+<body>
+    <h1>Timezone Helper Functions Test</h1>
+    <div id="results"></div>
+
+    <script>
+        // Copy the helper functions from script.js
+        function formatDateForInput(dateString) {
+            if (!dateString) return '';
+            
+            const date = new Date(dateString);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatTimeForInput(dateTimeString) {
+            if (!dateTimeString) return '';
+            
+            const date = new Date(dateTimeString);
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            
+            return `${hours}:${minutes}`;
+        }
+
+        function createLocalDateTime(dateStr, timeStr) {
+            if (!dateStr) return null;
+            
+            if (timeStr) {
+                const [year, month, day] = dateStr.split('-').map(Number);
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                return new Date(year, month - 1, day, hours, minutes);
+            } else {
+                const [year, month, day] = dateStr.split('-').map(Number);
+                return new Date(year, month - 1, day);
+            }
+        }
+
+        function formatDateForCalendar(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Test the functions
+        function runTests() {
+            const resultsDiv = document.getElementById('results');
+            let html = '<h2>Test Results</h2>';
+            
+            // Test 1: Current timezone
+            const now = new Date();
+            html += `<h3>Current Timezone Test</h3>`;
+            html += `<p>Current Date/Time: ${now.toString()}</p>`;
+            html += `<p>Timezone Offset: ${now.getTimezoneOffset()} minutes</p>`;
+            html += `<p>formatDateForCalendar(now): ${formatDateForCalendar(now)}</p>`;
+            html += `<p>formatTimeForInput(now.toISOString()): ${formatTimeForInput(now.toISOString())}</p>`;
+            
+            // Test 2: Date input formatting
+            html += `<h3>Date Input Formatting Test</h3>`;
+            const testDateTime = '2025-09-28T15:30:00.000Z'; // UTC time
+            html += `<p>Test DateTime (UTC): ${testDateTime}</p>`;
+            html += `<p>formatDateForInput: ${formatDateForInput(testDateTime)}</p>`;
+            html += `<p>formatTimeForInput: ${formatTimeForInput(testDateTime)}</p>`;
+            
+            // Test 3: Round-trip test
+            html += `<h3>Round-trip Test</h3>`;
+            const testDate = '2025-09-28';
+            const testTime = '15:30';
+            const created = createLocalDateTime(testDate, testTime);
+            html += `<p>Input: ${testDate} ${testTime}</p>`;
+            html += `<p>Created DateTime: ${created.toString()}</p>`;
+            html += `<p>ISO String: ${created.toISOString()}</p>`;
+            html += `<p>Back to Date Input: ${formatDateForInput(created.toISOString())}</p>`;
+            html += `<p>Back to Time Input: ${formatTimeForInput(created.toISOString())}</p>`;
+            
+            // Test 4: All-day event
+            html += `<h3>All-day Event Test</h3>`;
+            const allDayDate = createLocalDateTime('2025-09-28');
+            html += `<p>All-day date for 2025-09-28: ${allDayDate.toString()}</p>`;
+            html += `<p>formatDateForCalendar: ${formatDateForCalendar(allDayDate)}</p>`;
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

@@ -11,6 +11,54 @@ const SCOPES = "https://www.googleapis.com/auth/calendar";
 // Store events by date for color coding
 let eventsByDate = {};
 
+// Timezone-aware helper functions
+function formatDateForInput(dateString) {
+    // For date inputs, we want YYYY-MM-DD in local timezone
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+}
+
+function formatTimeForInput(dateTimeString) {
+    // For time inputs, we want HH:MM in local timezone
+    if (!dateTimeString) return '';
+    
+    const date = new Date(dateTimeString);
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${hours}:${minutes}`;
+}
+
+function createLocalDateTime(dateStr, timeStr) {
+    // Create a Date object in local timezone from date and time strings
+    if (!dateStr) return null;
+    
+    if (timeStr) {
+        // Timed event - combine date and time in local timezone
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return new Date(year, month - 1, day, hours, minutes);
+    } else {
+        // All-day event - just the date
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+}
+
+function formatDateForCalendar(date) {
+    // Format date as YYYY-MM-DD for calendar display
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // DOM element references with null checks
 function getElement(id, required = true) {
     const element = document.getElementById(id);
@@ -164,7 +212,7 @@ function renderCalendar(date = currentDisplayDate) {
     for (let day = 1; day <= daysInMonth; day++) {
         const today = new Date();
         const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dateStr = formatDateForCalendar(new Date(year, month, day));
         const hasEvents = eventsByDate[dateStr] && eventsByDate[dateStr].length > 0;
         
         let classes = [];
@@ -442,9 +490,18 @@ async function loadCalendarEventsForMonth(date) {
             }
         });
         
-        // Add new events
+        // Add new events with proper timezone handling
         events.forEach(event => {
-            const eventDate = event.start.date || event.start.dateTime.split('T')[0];
+            let eventDate;
+            if (event.start.date) {
+                // All-day event - use date as-is
+                eventDate = event.start.date;
+            } else {
+                // Timed event - get date in local timezone
+                const startDateTime = new Date(event.start.dateTime);
+                eventDate = formatDateForCalendar(startDateTime);
+            }
+            
             if (!eventsByDate[eventDate]) {
                 eventsByDate[eventDate] = [];
             }
@@ -507,9 +564,13 @@ async function listUpcomingEvents() {
     if (events && events.length > 0) {
         let html = '<b>Upcoming Events:</b><ul>';
         events.forEach((event, index) => {
-            const when = event.start.dateTime || event.start.date;
-            const eventDate = new Date(when).toLocaleDateString();
-            const eventTime = event.start.dateTime ? new Date(event.start.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'All day';
+            // Use timezone-aware formatting for consistent display
+            const eventDate = event.start.date ? 
+                new Date(event.start.date + 'T00:00:00').toLocaleDateString() :
+                new Date(event.start.dateTime).toLocaleDateString();
+            const eventTime = event.start.dateTime ? 
+                formatTimeForInput(event.start.dateTime) : 
+                'All day';
             
             html += `<li class="event-item" data-event-id="${event.id}" style="cursor: pointer;">`;
             html += `<strong>${event.summary}</strong><br>`;
@@ -534,9 +595,9 @@ async function listUpcomingEvents() {
 function showTodaysEvents() {
     debugLog('Showing today\'s events...');
     
-    // Get today's date in YYYY-MM-DD format
+    // Get today's date in YYYY-MM-DD format using timezone-aware helper
     const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayStr = formatDateForCalendar(today);
     
     // Show today's events using the existing function
     showDayEvents(todayStr);
@@ -559,10 +620,10 @@ function showDayEvents(dateStr) {
     } else {
         html += `<ul>`;
         dayEvents.forEach(event => {
-            // Use the dateStr directly to avoid timezone conversion issues
-            const displayDate = new Date(dateStr + 'T00:00:00').toLocaleDateString();
+            // Format date and time in local timezone
+            const displayDate = new Date(dateStr).toLocaleDateString();
             const eventTime = event.start.dateTime ? 
-                new Date(event.start.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
+                formatTimeForInput(event.start.dateTime) : 
                 'All day';
             
             // Log event ID for debugging
@@ -710,13 +771,11 @@ function showEditForm(event, isNew = false) {
             if (startTimeLabel) startTimeLabel.style.display = 'none';
             if (endTimeLabel) endTimeLabel.style.display = 'none';
         } else {
-            // Timed event
-            const startDateTime = new Date(event.start.dateTime);
-            const endDateTime = new Date(event.end.dateTime);
-            if (startDateInput) startDateInput.value = startDateTime.toISOString().split('T')[0];
-            if (endDateInput) endDateInput.value = endDateTime.toISOString().split('T')[0];
-            if (startTimeInput) startTimeInput.value = startDateTime.toTimeString().substring(0, 5);
-            if (endTimeInput) endTimeInput.value = endDateTime.toTimeString().substring(0, 5);
+            // Timed event - use timezone-aware formatting
+            if (startDateInput) startDateInput.value = formatDateForInput(event.start.dateTime);
+            if (endDateInput) endDateInput.value = formatDateForInput(event.end.dateTime);
+            if (startTimeInput) startTimeInput.value = formatTimeForInput(event.start.dateTime);
+            if (endTimeInput) endTimeInput.value = formatTimeForInput(event.end.dateTime);
             // Show time fields for timed events
             if (startTimeInput) startTimeInput.style.display = 'block';
             if (endTimeInput) endTimeInput.style.display = 'block';
@@ -811,8 +870,14 @@ if (saveBtn) {
             eventData.start = { date: startDate };
             eventData.end = { date: endDate };
         } else {
-            const startDateTime = new Date(`${startDate}T${startTime}`);
-            const endDateTime = new Date(`${endDate}T${endTime}`);
+            // Create datetime objects in local timezone, then convert to ISO for API
+            const startDateTime = createLocalDateTime(startDate, startTime);
+            const endDateTime = createLocalDateTime(endDate, endTime);
+            
+            if (!startDateTime || !endDateTime) {
+                debugLog('❌ Invalid date/time values', 'error');
+                return;
+            }
             
             eventData.start = { dateTime: startDateTime.toISOString() };
             eventData.end = { dateTime: endDateTime.toISOString() };
