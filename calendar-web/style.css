@@ -478,6 +478,17 @@ body {
     border-radius: 8px 8px 0 0;
     overflow: hidden;
     margin-bottom: 1px;
+    /* Account for scrollbar width to maintain alignment */
+    padding-right: 8px;
+    box-sizing: border-box;
+}
+
+/* Alternative approach for browsers without scrollbar-gutter support */
+@supports not (scrollbar-gutter: stable) {
+    .week-header {
+        /* Slightly larger padding for older browsers */
+        padding-right: 12px;
+    }
 }
 
 .week-day-header {
@@ -512,7 +523,10 @@ body {
     border: 1px solid var(--border-primary);
     border-radius: 0 0 8px 8px;
     overflow-y: auto;
+    overflow-x: hidden;
     max-height: 600px;
+    /* Ensure scrollbar is always present to maintain consistent layout */
+    scrollbar-gutter: stable;
 }
 
 .week-row {
@@ -553,6 +567,47 @@ body {
 
 .time-slot:last-child {
     border-right: none;
+}
+
+/* Modern Scrollbar Styling */
+.week-content::-webkit-scrollbar,
+.day-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.week-content::-webkit-scrollbar-track,
+.day-content::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.week-content::-webkit-scrollbar-thumb,
+.day-content::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: 4px;
+    border: 1px solid var(--bg-secondary);
+}
+
+.week-content::-webkit-scrollbar-thumb:hover,
+.day-content::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* Dark theme scrollbar improvements */
+body.dark .week-content::-webkit-scrollbar-track,
+body.dark .day-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+body.dark .week-content::-webkit-scrollbar-thumb,
+body.dark .day-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+body.dark .week-content::-webkit-scrollbar-thumb:hover,
+body.dark .day-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
 }
 
 /* Week Event Styles */
@@ -636,7 +691,10 @@ body {
     border: 1px solid var(--border-primary);
     border-radius: 0 0 8px 8px;
     overflow-y: auto;
+    overflow-x: hidden;
     max-height: 700px;
+    /* Ensure scrollbar is always present to maintain consistent layout */
+    scrollbar-gutter: stable;
 }
 
 .day-time-row {

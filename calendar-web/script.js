@@ -286,6 +286,8 @@ function setViewMode(newMode) {
     // Update UI to reflect new view mode
     updateViewSwitcher();
     updatePanelVisibility(); // Ensure panel visibility is correct
+    
+    // Re-render with current data (events should already be loaded)
     renderCurrentView();
 }
 
@@ -422,8 +424,6 @@ function getWeekEnd(date) {
 
 // Week view implementation
 function renderWeekView() {
-    debugLog('📊 Rendering week view');
-    
     if (!calendarTable) {
         debugLog('❌ Calendar table element not found', 'error');
         return;
@@ -1309,10 +1309,8 @@ if (nextMonthBtn) {
     };
 }
 
-function navigatePrevious() {
+async function navigatePrevious() {
     const originalViewMode = currentViewMode; // Preserve view mode
-    
-    debugLog(`🔙 Navigation started in ${currentViewMode} mode`);
     
     switch (currentViewMode) {
         case VIEW_MODES.MONTH:
@@ -1329,20 +1327,16 @@ function navigatePrevious() {
     // Ensure view mode is preserved
     currentViewMode = originalViewMode;
     
-    debugLog(`🔙 About to render ${currentViewMode} view`);
-    renderCurrentView();
-    
+    // Load events - loadCalendarEventsForMonth will render when complete
     if (accessToken) {
-        loadCalendarEventsForMonth(currentDisplayDate);
+        await loadCalendarEventsForMonth(currentDisplayDate);
+    } else {
+        renderCurrentView();
     }
-    
-    debugLog(`🔙 Navigation complete - still in ${currentViewMode}: ${currentDisplayDate.toDateString()}`);
 }
 
-function navigateNext() {
+async function navigateNext() {
     const originalViewMode = currentViewMode; // Preserve view mode
-    
-    debugLog(`▶️ Navigation started in ${currentViewMode} mode`);
     
     switch (currentViewMode) {
         case VIEW_MODES.MONTH:
@@ -1359,14 +1353,12 @@ function navigateNext() {
     // Ensure view mode is preserved
     currentViewMode = originalViewMode;
     
-    debugLog(`▶️ About to render ${currentViewMode} view`);
-    renderCurrentView();
-    
+    // Load events - loadCalendarEventsForMonth will render when complete
     if (accessToken) {
-        loadCalendarEventsForMonth(currentDisplayDate);
+        await loadCalendarEventsForMonth(currentDisplayDate);
+    } else {
+        renderCurrentView();
     }
-    
-    debugLog(`▶️ Navigation complete - still in ${currentViewMode}: ${currentDisplayDate.toDateString()}`);
 }
 
 // Initialize login button and UI state
@@ -1474,16 +1466,21 @@ async function showCalendar() {
     if (loginSection) loginSection.style.display = 'none';
     if (userSection) userSection.style.display = 'flex';
     if (dashboard) dashboard.style.display = 'grid';
-    currentDisplayDate = new Date(); // Reset to current month when showing calendar
+    currentDisplayDate = new Date(); // Reset to current date when showing calendar
     
     // Ensure panel visibility is correct for the current view mode
     updatePanelVisibility();
-    renderCurrentView(); // Use the new view system instead of direct renderCalendar
     
-    // Load events for calendar coloring and initial display
+    // Load events - loadCalendarEventsForMonth will call renderCurrentView() when done
     if (accessToken) {
         await loadCalendarEventsForMonth(currentDisplayDate);
-        showTodaysEvents(); // Show today's events after events are loaded
+    } else {
+        renderCurrentView();
+    }
+    
+    // Show today's events after everything is loaded and rendered
+    if (accessToken) {
+        showTodaysEvents();
     }
 }
 
@@ -1649,7 +1646,6 @@ async function maybeEnableButtons() {
         debugLog('🔄 Attempting to restore previous authentication...');
         const storedToken = getTokenFromStorage();
         if (storedToken) {
-            debugLog('🎉 Restoring previous authentication session');
             accessToken = storedToken;
             
             // Set the token for gapi.client
@@ -1657,14 +1653,14 @@ async function maybeEnableButtons() {
                 access_token: accessToken
             });
             
+            // Small delay to ensure token is fully set
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
             // Show calendar interface
             await showCalendar();
             
             // Update login button to show sign out option
             updateLoginButton('Sign Out', handleSignoutClick, false);
-            
-            // Show restoration message
-            debugLog('Successfully restored authentication from stored token');
         } else {
             debugLog('No valid stored token, showing login button');
             updateLoginButton('Login with Google', handleAuthClick, false);
@@ -1700,7 +1696,27 @@ async function loadCalendarEvents() {
 }
 
 async function loadCalendarEventsForMonth(date) {
-    debugLog(`Loading calendar events for ${date.toLocaleString('default', { month: 'long', year: 'numeric' })}...`);
+    // Determine the appropriate date range based on current view mode
+    let startDate, endDate, rangeDescription;
+    
+    if (currentViewMode === VIEW_MODES.WEEK) {
+        // For week view, load the entire week (which may span months)
+        startDate = getWeekStart(date);
+        endDate = getWeekEnd(date);
+        rangeDescription = `week of ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+    } else if (currentViewMode === VIEW_MODES.DAY) {
+        // For day view, load the specific day plus some buffer
+        startDate = new Date(date);
+        endDate = new Date(date);
+        rangeDescription = `day ${date.toLocaleDateString()}`;
+    } else {
+        // For month view, load the entire month
+        startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        rangeDescription = `${date.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+    }
+    
+    debugLog(`Loading calendar events for ${rangeDescription}...`);
     
     // Check if we have an access token
     if (!accessToken) {
@@ -1713,30 +1729,27 @@ async function loadCalendarEventsForMonth(date) {
         access_token: accessToken
     });
     
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    
     try {
         const request = {
             'calendarId': 'primary',
-            'timeMin': startOfMonth.toISOString(),
-            'timeMax': endOfMonth.toISOString(),
+            'timeMin': startDate.toISOString(),
+            'timeMax': new Date(endDate.getTime() + 24 * 60 * 60 * 1000).toISOString(), // Add 1 day to include end date
             'showDeleted': false,
             'singleEvents': true,
             'orderBy': 'startTime'
         };
         
-        debugLog('Making Calendar API request for month events...');
         const response = await gapi.client.calendar.events.list(request);
         const events = response.result.items;
-        debugLog(`Found ${events.length} events for ${date.toLocaleString('default', { month: 'long', year: 'numeric' })}`);
+        debugLog(`Found ${events.length} events for ${rangeDescription}`);
         
-        // Clear existing events for this month and add new ones
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        // Clear existing events for the date range and add new ones
+        const startDateStr = formatDateForCalendar(startDate);
+        const endDateStr = formatDateForCalendar(endDate);
         
-        // Remove events from eventsByDate that belong to this month
+        // Remove events from eventsByDate that belong to this date range
         Object.keys(eventsByDate).forEach(dateKey => {
-            if (dateKey.startsWith(monthKey)) {
+            if (dateKey >= startDateStr && dateKey <= endDateStr) {
                 delete eventsByDate[dateKey];
             }
         });
