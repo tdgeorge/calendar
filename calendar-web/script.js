@@ -126,6 +126,12 @@ function applyTheme(theme) {
     }
     
     debugLog(`🎨 Applied ${theme} theme`);
+    
+    // Phase 5: Refresh theme-specific elements
+    setTimeout(() => {
+        updateCurrentTimeLine();  // Refresh current time indicator with new theme
+        updateViewSwitcher();     // Refresh view switcher appearance
+    }, 50);
 }
 
 function toggleTheme() {
@@ -331,6 +337,11 @@ function renderCurrentView() {
     }
     
     debugLog(`✅ Finished rendering ${currentViewMode} view`);
+    
+    // Phase 5: Update current time indicator after view renders
+    setTimeout(() => {
+        updateCurrentTimeLine();
+    }, 100); // Small delay to ensure DOM is ready
 }
 
 function updatePanelVisibility() {
@@ -796,6 +807,9 @@ let dragStartX = 0;
 let dragStartY = 0;
 let originalPosition = null;
 
+// Phase 5: Polish & Integration
+let currentTimeLineInterval = null;
+
 // Drag & Drop Configuration
 const DRAG_CONFIG = {
     THRESHOLD: 5, // Minimum pixels to move before starting drag
@@ -860,6 +874,23 @@ function makeEventDraggable(eventElement, eventId, eventData) {
         e.stopPropagation();
         const touch = e.touches[0];
         startDragOperation(touch, eventElement, eventId, eventData);
+    });
+    
+    // Phase 5: Enhanced mobile touch support
+    eventElement.addEventListener('touchmove', (e) => {
+        if (isDragging) {
+            e.preventDefault(); // Prevent scrolling during drag
+            const touch = e.touches[0];
+            handleGlobalMouseMove(touch);
+        }
+    });
+    
+    eventElement.addEventListener('touchend', (e) => {
+        if (isDragging) {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            handleGlobalMouseUp(touch);
+        }
     });
 }
 
@@ -2421,12 +2452,204 @@ function toggleDebugConsole() {
     }
 }
 
+// Phase 5: Current Time Indicator Functions
+function initializeCurrentTimeIndicator() {
+    debugLog('🕐 Initializing current time indicator');
+    
+    // Update immediately and then every minute
+    updateCurrentTimeLine();
+    
+    // Clear any existing interval
+    if (currentTimeLineInterval) {
+        clearInterval(currentTimeLineInterval);
+    }
+    
+    // Update every minute (60000ms)
+    currentTimeLineInterval = setInterval(updateCurrentTimeLine, 60000);
+}
+
+function updateCurrentTimeLine() {
+    // Only show time line in week and day views
+    if (currentViewMode === VIEW_MODES.WEEK || currentViewMode === VIEW_MODES.DAY) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinutes = now.getMinutes();
+        
+        // Check if we're viewing today
+        const isViewingToday = isViewingCurrentDay();
+        
+        // Only show if current time is within our displayed range (6 AM - 10 PM) AND we're viewing today
+        if (currentHour >= 6 && currentHour <= 22 && isViewingToday) {
+            showCurrentTimeLine(currentHour, currentMinutes);
+        } else {
+            hideCurrentTimeLine();
+        }
+    } else {
+        hideCurrentTimeLine();
+    }
+}
+
+function showCurrentTimeLine(hour, minutes) {
+    // Remove existing time line
+    const existingLine = document.getElementById('current-time-line');
+    if (existingLine) {
+        existingLine.remove();
+    }
+    
+    // Calculate position based on current time
+    const timeLinePosition = calculateTimePosition(hour, minutes);
+    
+    if (timeLinePosition === null) return;
+    
+    // Create time line element
+    const timeLine = document.createElement('div');
+    timeLine.id = 'current-time-line';
+    timeLine.className = 'current-time-indicator';
+    
+    // Add time label
+    const timeLabel = document.createElement('div');
+    timeLabel.className = 'current-time-label';
+    timeLabel.textContent = formatCurrentTime(hour, minutes);
+    
+    const timeLineLine = document.createElement('div');
+    timeLineLine.className = 'current-time-line';
+    
+    timeLine.appendChild(timeLabel);
+    timeLine.appendChild(timeLineLine);
+    
+    // Position the time line
+    timeLine.style.position = 'absolute';
+    timeLine.style.top = timeLinePosition.top + 'px';
+    timeLine.style.left = timeLinePosition.left + 'px';
+    timeLine.style.right = timeLinePosition.right + 'px';
+    timeLine.style.zIndex = '100';
+    
+    // Find the appropriate container
+    const container = currentViewMode === VIEW_MODES.WEEK ? 
+        document.querySelector('.week-content') : 
+        document.querySelector('.day-content');
+    
+    if (container) {
+        container.style.position = 'relative';
+        container.appendChild(timeLine);
+        debugLog(`🕐 Current time line shown at ${hour}:${minutes.toString().padStart(2, '0')}`);
+    }
+}
+
+function calculateTimePosition(hour, minutes) {
+    const startHour = 6;
+    const endHour = 22;
+    
+    if (hour < startHour || hour > endHour) return null;
+    
+    if (currentViewMode === VIEW_MODES.WEEK) {
+        // Week view positioning - only show on today's column
+        const hourRows = document.querySelectorAll('.week-row');
+        const targetRowIndex = hour - startHour;
+        
+        if (hourRows[targetRowIndex]) {
+            const row = hourRows[targetRowIndex];
+            const rect = row.getBoundingClientRect();
+            const containerRect = document.querySelector('.week-content').getBoundingClientRect();
+            
+            // Find today's column index
+            const today = new Date();
+            const weekStart = getWeekStart(currentDisplayDate);
+            const todayColumnIndex = Math.floor((today - weekStart) / (1000 * 60 * 60 * 24));
+            
+            // Only show if today is within the current week (0-6)
+            if (todayColumnIndex < 0 || todayColumnIndex > 6) return null;
+            
+            // Calculate the width of each day column (total width - time label width) / 7 days
+            const timeSlots = row.querySelectorAll('.time-slot');
+            if (!timeSlots[todayColumnIndex]) return null;
+            
+            const todaySlot = timeSlots[todayColumnIndex];
+            const slotRect = todaySlot.getBoundingClientRect();
+            
+            // Calculate exact position within the hour based on minutes
+            const minuteOffset = (minutes / 60) * row.offsetHeight;
+            
+            return {
+                top: (rect.top - containerRect.top) + minuteOffset,
+                left: slotRect.left - containerRect.left,
+                right: containerRect.right - slotRect.right
+            };
+        }
+    } else if (currentViewMode === VIEW_MODES.DAY) {
+        // Day view positioning (30-minute intervals)
+        const timeSlotIndex = ((hour - startHour) * 2) + (minutes >= 30 ? 1 : 0);
+        const timeRows = document.querySelectorAll('.day-time-row');
+        
+        if (timeRows[timeSlotIndex]) {
+            const row = timeRows[timeSlotIndex];
+            const rect = row.getBoundingClientRect();
+            const containerRect = document.querySelector('.day-content').getBoundingClientRect();
+            
+            // For day view, calculate position within the 30-minute slot
+            const slotMinutes = minutes % 30;
+            const minuteOffset = (slotMinutes / 30) * row.offsetHeight;
+            
+            return {
+                top: (rect.top - containerRect.top) + minuteOffset,
+                left: 120, // Skip time label column
+                right: 0
+            };
+        }
+    }
+    
+    return null;
+}
+
+function formatCurrentTime(hour, minutes) {
+    const hourStr = hour === 0 ? '12' : hour > 12 ? (hour - 12).toString() : hour.toString();
+    const minuteStr = minutes.toString().padStart(2, '0');
+    const period = hour < 12 ? 'AM' : 'PM';
+    return `${hourStr}:${minuteStr} ${period}`;
+}
+
+function hideCurrentTimeLine() {
+    const existingLine = document.getElementById('current-time-line');
+    if (existingLine) {
+        existingLine.remove();
+    }
+}
+
+function isViewingCurrentDay() {
+    const today = new Date();
+    const todayStr = formatDateForCalendar(today);
+    
+    if (currentViewMode === VIEW_MODES.DAY) {
+        // In day view, check if currentDisplayDate is today
+        const displayDateStr = formatDateForCalendar(currentDisplayDate);
+        return displayDateStr === todayStr;
+    } else if (currentViewMode === VIEW_MODES.WEEK) {
+        // In week view, check if today falls within the current week
+        const weekStart = getWeekStart(currentDisplayDate);
+        const weekEnd = getWeekEnd(currentDisplayDate);
+        
+        return today >= weekStart && today <= weekEnd;
+    }
+    
+    return false;
+}
+
 // Initialize drag and drop system
 initializeDragAndDrop();
 
 // Initialize events arrays
 allEvents = [];
 window.currentEvents = [];
+
+// Phase 5: Initialize current time indicator
+initializeCurrentTimeIndicator();
+
+// Phase 5: Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (currentTimeLineInterval) {
+        clearInterval(currentTimeLineInterval);
+    }
+});
 
 // Show calendar for non-logged-in users (demo only)
 renderCurrentView();
