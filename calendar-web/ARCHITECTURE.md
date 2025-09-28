@@ -38,7 +38,8 @@ The frontend is a Single Page Application (SPA) built with vanilla JavaScript, f
 **UI Components**
 - **Login Section**: Authentication interface
 - **Calendar Display**: Interactive calendar view
-- **Events Panel**: Shows upcoming events
+- **Events Panel**: Shows upcoming events with click-to-edit functionality
+- **Event Edit Form**: Modal form for editing event details
 - **Debug Console**: Development and troubleshooting interface
 
 **Configuration Module**

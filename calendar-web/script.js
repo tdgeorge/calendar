@@ -6,7 +6,7 @@
 let CLIENT_ID = '';
 let API_KEY = '';
 const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
-const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
+const SCOPES = "https://www.googleapis.com/auth/calendar";
 
 // Store events by date for color coding
 let eventsByDate = {};
@@ -383,12 +383,24 @@ async function listUpcomingEvents() {
     const events = response.result.items;
     if (events && events.length > 0) {
         let html = '<b>Upcoming Events:</b><ul>';
-        events.forEach(event => {
+        events.forEach((event, index) => {
             const when = event.start.dateTime || event.start.date;
-            html += `<li>${when}: ${event.summary}</li>`;
+            const eventDate = new Date(when).toLocaleDateString();
+            const eventTime = event.start.dateTime ? new Date(event.start.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'All day';
+            
+            html += `<li class="event-item" onclick="editEvent('${event.id}')" data-event-id="${event.id}">`;
+            html += `<strong>${event.summary}</strong><br>`;
+            html += `📅 ${eventDate} ${eventTime}`;
+            if (event.description) {
+                html += `<br>📝 ${event.description.substring(0, 50)}${event.description.length > 50 ? '...' : ''}`;
+            }
+            html += `</li>`;
         });
         html += '</ul>';
         eventsDiv.innerHTML = html;
+        
+        // Store events for editing
+        window.currentEvents = events;
         debugLog(`Displayed ${events.length} events`);
     } else {
         eventsDiv.innerHTML = 'No upcoming events found.';
@@ -440,6 +452,196 @@ function handleSignoutClick() {
         debugLog('User signed out successfully');
     }
 }
+
+// Event editing functionality
+let currentEditingEvent = null;
+
+function editEvent(eventId) {
+    debugLog(`Edit event clicked: ${eventId}`);
+    
+    if (!window.currentEvents) {
+        debugLog('No events available for editing', 'error');
+        return;
+    }
+    
+    const event = window.currentEvents.find(e => e.id === eventId);
+    if (!event) {
+        debugLog(`Event not found: ${eventId}`, 'error');
+        return;
+    }
+    
+    currentEditingEvent = event;
+    showEditForm(event);
+}
+
+function showEditForm(event) {
+    debugLog(`Showing edit form for event: ${event.summary}`);
+    
+    // Populate form fields
+    document.getElementById('edit-title').value = event.summary || '';
+    document.getElementById('edit-description').value = event.description || '';
+    
+    const isAllDay = !event.start.dateTime;
+    document.getElementById('edit-all-day').checked = isAllDay;
+    
+    if (isAllDay) {
+        // All day event
+        const startDate = event.start.date;
+        const endDate = event.end.date;
+        
+        document.getElementById('edit-start-date').value = startDate;
+        document.getElementById('edit-end-date').value = endDate;
+        document.getElementById('edit-start-time').value = '';
+        document.getElementById('edit-end-time').value = '';
+        
+        // Hide time fields for all-day events
+        document.getElementById('edit-start-time').style.display = 'none';
+        document.getElementById('edit-end-time').style.display = 'none';
+        document.querySelector('label[for="edit-start-time"]').style.display = 'none';
+        document.querySelector('label[for="edit-end-time"]').style.display = 'none';
+    } else {
+        // Timed event
+        const startDateTime = new Date(event.start.dateTime);
+        const endDateTime = new Date(event.end.dateTime);
+        
+        document.getElementById('edit-start-date').value = startDateTime.toISOString().split('T')[0];
+        document.getElementById('edit-end-date').value = endDateTime.toISOString().split('T')[0];
+        document.getElementById('edit-start-time').value = startDateTime.toTimeString().substring(0, 5);
+        document.getElementById('edit-end-time').value = endDateTime.toTimeString().substring(0, 5);
+        
+        // Show time fields for timed events
+        document.getElementById('edit-start-time').style.display = 'block';
+        document.getElementById('edit-end-time').style.display = 'block';
+        document.querySelector('label[for="edit-start-time"]').style.display = 'block';
+        document.querySelector('label[for="edit-end-time"]').style.display = 'block';
+    }
+    
+    // Show edit section
+    document.getElementById('edit-section').style.display = 'block';
+    document.getElementById('edit-title').focus();
+}
+
+function hideEditForm() {
+    document.getElementById('edit-section').style.display = 'none';
+    currentEditingEvent = null;
+    debugLog('Edit form hidden');
+}
+
+async function saveEventChanges() {
+    if (!currentEditingEvent) {
+        debugLog('No event selected for editing', 'error');
+        return;
+    }
+    
+    debugLog('Saving event changes...');
+    
+    // Disable save button to prevent double-clicks
+    const saveBtn = document.getElementById('save-event-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    
+    try {
+        // Get form values
+        const title = document.getElementById('edit-title').value.trim();
+        const description = document.getElementById('edit-description').value.trim();
+        const isAllDay = document.getElementById('edit-all-day').checked;
+        const startDate = document.getElementById('edit-start-date').value;
+        const endDate = document.getElementById('edit-end-date').value;
+        const startTime = document.getElementById('edit-start-time').value;
+        const endTime = document.getElementById('edit-end-time').value;
+        
+        if (!title) {
+            alert('Title is required');
+            return;
+        }
+        
+        if (!startDate) {
+            alert('Start date is required');
+            return;
+        }
+        
+        if (!isAllDay && (!startTime || !endTime)) {
+            alert('Start and end times are required for timed events');
+            return;
+        }
+        
+        // Build updated event object
+        const updatedEvent = {
+            id: currentEditingEvent.id,
+            summary: title,
+            description: description
+        };
+        
+        if (isAllDay) {
+            updatedEvent.start = { date: startDate };
+            updatedEvent.end = { date: endDate };
+        } else {
+            const startDateTime = new Date(`${startDate}T${startTime}`);
+            const endDateTime = new Date(`${endDate}T${endTime}`);
+            
+            updatedEvent.start = { dateTime: startDateTime.toISOString() };
+            updatedEvent.end = { dateTime: endDateTime.toISOString() };
+        }
+        
+        debugLog(`Updating event: ${JSON.stringify(updatedEvent)}`);
+        
+        // Make API call to update event
+        const response = await gapi.client.calendar.events.update({
+            calendarId: 'primary',
+            eventId: currentEditingEvent.id,
+            resource: updatedEvent
+        });
+        
+        debugLog('Event updated successfully');
+        
+        // Refresh events list
+        await listUpcomingEvents();
+        
+        // Hide edit form
+        hideEditForm();
+        
+        // Show success message
+        alert('Event updated successfully!');
+        
+    } catch (error) {
+        debugLog(`Error updating event: ${error.message || error}`, 'error');
+        alert(`Failed to update event: ${error.message || 'Unknown error'}`);
+    } finally {
+        // Re-enable save button
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+    }
+}
+
+// Event listeners for edit form
+document.addEventListener('DOMContentLoaded', () => {
+    // Save button
+    document.getElementById('save-event-btn').addEventListener('click', saveEventChanges);
+    
+    // Cancel button
+    document.getElementById('cancel-edit-btn').addEventListener('click', hideEditForm);
+    
+    // All-day checkbox toggle
+    document.getElementById('edit-all-day').addEventListener('change', (e) => {
+        const isAllDay = e.target.checked;
+        const startTimeInput = document.getElementById('edit-start-time');
+        const endTimeInput = document.getElementById('edit-end-time');
+        const startTimeLabel = document.querySelector('label[for="edit-start-time"]');
+        const endTimeLabel = document.querySelector('label[for="edit-end-time"]');
+        
+        if (isAllDay) {
+            startTimeInput.style.display = 'none';
+            endTimeInput.style.display = 'none';
+            startTimeLabel.style.display = 'none';
+            endTimeLabel.style.display = 'none';
+        } else {
+            startTimeInput.style.display = 'block';
+            endTimeInput.style.display = 'block';
+            startTimeLabel.style.display = 'block';
+            endTimeLabel.style.display = 'block';
+        }
+    });
+});
 
 // Show calendar for non-logged-in users (demo only)
 renderCalendar();

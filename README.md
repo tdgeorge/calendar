@@ -21,7 +21,16 @@ A simple slideshow application built with Tkinter.
 
 ## Getting Started
 
-Each project has its own README with detailed setup instructions:
+### Quick Start (Calendar Web App)
+```bash
+cd calendar-web
+cp start-server-example.sh start-server.sh
+# Edit start-server.sh with your Google credentials
+chmod +x start-server.sh
+./start-server.sh
+```
+
+### Detailed Setup Instructions
 - [Calendar Web App Setup](./calendar-web/README.md)
 - [Slideshow App Setup](./simple-tk-slideshow/README.md)
 

@@ -7,6 +7,8 @@ A modern web application that integrates with Google Calendar API using the late
 - 📅 Interactive calendar display
 - 🔐 Secure Google OAuth2 authentication using Google Identity Services
 - 📋 View upcoming events from Google Calendar
+- ✏️ Edit event details (title, description, time, duration)
+- 💾 Save changes back to Google Calendar
 - 🖥️ Responsive web interface
 - 🐛 Built-in debug console for troubleshooting
 
@@ -46,6 +48,13 @@ Before running this application, you need:
 2. Copy the **API Key** (format: `AIzaSyBxxxxxxxxxxxxxxxxxxxxx`)
 3. (Optional but recommended) Restrict the key to Calendar API only
 
+### 4. OAuth Consent Screen
+
+Ensure your OAuth consent screen is configured:
+1. Go to "APIs & Services" > "OAuth consent screen"
+2. Add the Calendar scope: `https://www.googleapis.com/auth/calendar`
+3. Add test users if your app is in testing mode
+
 ## Installation & Setup
 
 ### 1. Clone the Repository
@@ -55,10 +64,29 @@ git clone <repository-url>
 cd calendar/calendar-web
 ```
 
-### 2. Set Environment Variables
+### 2. Set Up Credentials
+
+**Option A: Using the Startup Script (Recommended)**
+
+1. Copy the example script:
+   ```bash
+   cp start-server-example.sh start-server.sh
+   ```
+
+2. Edit `start-server.sh` and replace the placeholder credentials:
+   ```bash
+   export GOOGLE_CLIENT_ID="your-actual-client-id.apps.googleusercontent.com"
+   export GOOGLE_API_KEY="AIzaSyByour-actual-api-key"
+   ```
+
+3. Make it executable:
+   ```bash
+   chmod +x start-server.sh
+   ```
+
+**Option B: Using Environment Variables**
 
 Set your Google credentials as environment variables:
-
 ```bash
 export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 export GOOGLE_API_KEY="AIzaSyBxxxxxxxxxxxxxxxxxxxxx"
@@ -66,11 +94,19 @@ export GOOGLE_API_KEY="AIzaSyBxxxxxxxxxxxxxxxxxxxxx"
 
 ### 3. Start the Server
 
+**Using the startup script:**
+```bash
+./start-server.sh
+# Or specify a custom port:
+./start-server.sh 3000
+```
+
+**Using Python directly:**
 ```bash
 python3 server.py 8000
 ```
 
-The server will start on `http://localhost:8000` and display the current status of your environment variables.
+The server will start and display the current status of your credentials and the server URL.
 
 ## Usage
 
@@ -78,17 +114,31 @@ The server will start on `http://localhost:8000` and display the current status 
 2. Click "Login with Google"
 3. Complete the OAuth2 authorization flow
 4. View your upcoming calendar events
-5. Use the debug console to troubleshoot any issues
+5. **Click on any event** to edit its details
+6. Update title, description, date, time, or duration
+7. Click "Save Changes" to update the event in Google Calendar
+8. Use the debug console to troubleshoot any issues
+
+### Editing Events
+
+- **Click on any event** in the upcoming events list to open the edit form
+- **Edit fields**: Title, description, start/end dates and times
+- **All-day events**: Check the "All Day Event" checkbox to hide time fields
+- **Save changes**: Click "Save Changes" to update the event in Google Calendar
+- **Cancel editing**: Click "Cancel" to close the form without saving
 
 ## Project Structure
 
 ```
 calendar-web/
-├── index.html          # Main HTML page
-├── script.js           # JavaScript application logic
-├── style.css           # Styling and layout
-├── server.py           # Python backend server
-└── README.md           # This file
+├── index.html              # Main HTML page
+├── script.js               # JavaScript application logic
+├── style.css               # Styling and layout
+├── server.py               # Python backend server
+├── start-server-example.sh # Example startup script template
+├── start-server.sh         # Your actual startup script (git-ignored)
+├── ARCHITECTURE.md         # Technical architecture documentation
+└── README.md               # This file
 ```
 
 ## API Endpoints
@@ -140,6 +190,17 @@ Use this console to troubleshoot any issues with authentication or API calls.
 - The user may not have any events in their calendar
 - Check the debug console for API call details
 
+**Event Editing Issues**
+- Ensure you have granted calendar write permissions during OAuth
+- If you previously granted only read permissions, sign out and sign back in
+- Check the debug console for detailed error messages
+- Verify that the event exists and you have edit permissions
+
+**Permission Errors**
+- The app requires `https://www.googleapis.com/auth/calendar` scope (not just readonly)
+- Sign out and sign back in to grant new permissions
+- Check OAuth consent screen configuration
+
 **Environment Variables Not Set**
 - The server will show "Not set" for missing credentials
 - Verify environment variables are exported correctly
@@ -157,6 +218,8 @@ Use this console to troubleshoot any issues with authentication or API calls.
 
 - API keys and client IDs are served to the frontend (this is normal for web applications)
 - Never expose Client Secrets in frontend code
+- **Important**: The `start-server.sh` file is ignored by git to prevent accidentally committing credentials
+- Use `start-server-example.sh` as a template and create your own `start-server.sh`
 - Consider implementing proper CORS policies for production
 - Use HTTPS in production environments
 - Regularly rotate API keys and OAuth credentials

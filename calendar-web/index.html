@@ -19,6 +19,52 @@
         </div>
         <table id="calendar-table"></table>
         <div id="events"></div>
+        
+        <!-- Event Edit Form -->
+        <div id="edit-section" style="display:none;">
+            <h3>Edit Event</h3>
+            <form id="event-edit-form">
+                <div class="form-group">
+                    <label for="edit-title">Title:</label>
+                    <input type="text" id="edit-title" name="title" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-description">Description:</label>
+                    <textarea id="edit-description" name="description" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-start-date">Start Date:</label>
+                    <input type="date" id="edit-start-date" name="startDate" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-start-time">Start Time:</label>
+                    <input type="time" id="edit-start-time" name="startTime">
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-end-date">End Date:</label>
+                    <input type="date" id="edit-end-date" name="endDate" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-end-time">End Time:</label>
+                    <input type="time" id="edit-end-time" name="endTime">
+                </div>
+                
+                <div class="form-group">
+                    <input type="checkbox" id="edit-all-day" name="allDay">
+                    <label for="edit-all-day">All Day Event</label>
+                </div>
+                
+                <div class="form-buttons">
+                    <button type="button" id="save-event-btn">Save Changes</button>
+                    <button type="button" id="cancel-edit-btn">Cancel</button>
+                </div>
+            </form>
+        </div>
     </div>
     <div id="debug-console">
         <h3>Debug Console</h3>
