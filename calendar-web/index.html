@@ -67,9 +67,11 @@
         </div>
     </div>
     <div id="debug-console">
-        <h3>Debug Console</h3>
-        <div id="debug-output"></div>
-        <button id="clear-debug">Clear</button>
+        <h3 id="debug-console-toggle" onclick="toggleDebugConsole()">Debug Console <span id="debug-toggle-icon">▲</span></h3>
+        <div id="debug-panel" style="display:none;">
+            <div id="debug-output"></div>
+            <button id="clear-debug">Clear</button>
+        </div>
     </div>
     <script src="https://apis.google.com/js/api.js" async defer onload="gapiLoaded()"></script>
     <script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>

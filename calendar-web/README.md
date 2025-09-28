@@ -10,7 +10,7 @@ A modern web application that integrates with Google Calendar API using the late
 - ✏️ Edit event details (title, description, time, duration)
 - 💾 Save changes back to Google Calendar
 - 🖥️ Responsive web interface
-- 🐛 Built-in debug console for troubleshooting
+- 🐛 Collapsible debug console for troubleshooting (hidden by default)
 
 ## Prerequisites
 
@@ -117,7 +117,7 @@ The server will start and display the current status of your credentials and the
 5. **Click on any event** to edit its details
 6. Update title, description, date, time, or duration
 7. Click "Save Changes" to update the event in Google Calendar
-8. Use the debug console to troubleshoot any issues
+8. Click "Debug Console" at the bottom to view logs and troubleshoot issues
 
 ### Editing Events
 

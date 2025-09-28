@@ -419,15 +419,29 @@ function showDayEvents(dateStr) {
     
     let html = `<b>Events for ${dateStr}:</b><ul>`;
     dayEvents.forEach(event => {
-        const time = event.start.dateTime ? 
+        const eventDate = new Date(dateStr).toLocaleDateString();
+        const eventTime = event.start.dateTime ? 
             new Date(event.start.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
             'All day';
-        html += `<li><strong>${time}</strong> - ${event.summary}`;
-        if (event.location) html += ` (${event.location})`;
+        
+        // Make events clickable just like in listUpcomingEvents
+        html += `<li class="event-item" onclick="editEvent('${event.id}')" data-event-id="${event.id}">`;
+        html += `<strong>${event.summary}</strong><br>`;
+        html += `📅 ${eventDate} ${eventTime}`;
+        if (event.description) {
+            html += `<br>📝 ${event.description.substring(0, 50)}${event.description.length > 50 ? '...' : ''}`;
+        }
+        if (event.location) {
+            html += `<br>📍 ${event.location}`;
+        }
         html += `</li>`;
     });
     html += '</ul>';
     eventsDiv.innerHTML = html;
+    
+    // Store events for editing (just like in listUpcomingEvents)
+    window.currentEvents = dayEvents;
+    debugLog(`Displayed ${dayEvents.length} events for ${dateStr}`);
 }
 
 function handleSignoutClick() {
@@ -642,6 +656,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// Debug console toggle functionality
+function toggleDebugConsole() {
+    const panel = document.getElementById('debug-panel');
+    const console = document.getElementById('debug-console');
+    const icon = document.getElementById('debug-toggle-icon');
+    
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        console.classList.remove('collapsed');
+        icon.textContent = '▲';
+        debugLog('Debug console opened');
+    } else {
+        panel.style.display = 'none';
+        console.classList.add('collapsed');
+        icon.textContent = '▼';
+    }
+}
 
 // Show calendar for non-logged-in users (demo only)
 renderCalendar();

@@ -3,6 +3,7 @@ body {
     background: #f4f4f4;
     margin: 0;
     padding: 0;
+    padding-bottom: 40px; /* Space for debug console label */
 }
 #calendar-section {
     max-width: 400px;
@@ -74,23 +75,54 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    background: #1e1e1e;
+    background: #1a1a1a;
     color: #fff;
-    padding: 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    border-top: 2px solid #333;
+    z-index: 1000;
+}
+
+#debug-console-toggle {
+    margin: 0;
+    padding: 8px 15px;
+    cursor: pointer;
+    user-select: none;
+    background: #1a1a1a;
+    border: none;
+    color: #fff;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+#debug-console-toggle:hover {
+    background: #333;
+}
+
+#debug-panel {
+    padding: 10px 15px;
     max-height: 200px;
     overflow-y: auto;
-    border-top: 2px solid #333;
-    font-family: monospace;
-    font-size: 12px;
+    border-top: 1px solid #333;
+    transition: all 0.3s ease-in-out;
 }
-#debug-console h3 {
-    margin: 0 0 10px 0;
-    color: #4CAF50;
-    font-size: 14px;
+
+#debug-toggle-icon {
+    font-size: 10px;
+    transition: transform 0.2s;
+}
+
+#debug-console.collapsed #debug-toggle-icon {
+    transform: rotate(180deg);
 }
 #debug-output {
     white-space: pre-wrap;
     margin-bottom: 10px;
+    max-height: 150px;
+    overflow-y: auto;
 }
 #clear-debug {
     background: #333;
