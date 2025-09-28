@@ -712,6 +712,20 @@ function showTodaysEvents() {
     showDayEvents(todayStr);
 }
 
+function showSelectedDateEvents() {
+    debugLog('Showing events for selected date...');
+    
+    // If we have a selected date, show events for that date
+    if (window.selectedDate) {
+        debugLog(`Showing events for selected date: ${window.selectedDate}`);
+        showDayEvents(window.selectedDate);
+    } else {
+        // Fallback to today's events if no date is selected
+        debugLog('No selected date found, falling back to today\'s events');
+        showTodaysEvents();
+    }
+}
+
 function showDayEvents(dateStr) {
     debugLog(`Clicked on date: ${dateStr}`);
     const dayEvents = eventsByDate[dateStr] || [];
@@ -895,12 +909,23 @@ function showEditForm(event, isNew = false) {
         // Update form title and save button text
         const editTitle = document.querySelector('#edit-section h3');
         const saveBtn = document.getElementById('save-event-btn');
+        const deleteBtn = document.getElementById('delete-event-btn');
+        
         if (isNew) {
             if (editTitle) editTitle.textContent = 'Create New Event';
             if (saveBtn) saveBtn.textContent = 'Create Event';
+            // Hide delete button for new events
+            if (deleteBtn) deleteBtn.style.display = 'none';
         } else {
             if (editTitle) editTitle.textContent = 'Edit Event';
             if (saveBtn) saveBtn.textContent = 'Save Changes';
+            // Show delete button for existing events
+            if (deleteBtn) {
+                deleteBtn.style.display = 'inline-block';
+                deleteBtn.classList.remove('confirm-mode');
+                deleteBtn.textContent = 'Delete Event';
+                deleteBtn.disabled = false;
+            }
         }
     
     // Show edit section
@@ -919,6 +944,21 @@ const editSection = document.getElementById('edit-section');
 if (editSection) editSection.style.display = 'none';
     currentEditingEvent = null;
     isCreatingNewEvent = false;
+    
+    // Reset delete button state
+    const deleteBtn = document.getElementById('delete-event-btn');
+    if (deleteBtn) {
+        deleteBtn.classList.remove('confirm-mode');
+        deleteBtn.textContent = 'Delete Event';
+        deleteBtn.disabled = false;
+    }
+    
+    // Clear any pending delete confirmation timeout
+    if (deleteConfirmTimeout) {
+        clearTimeout(deleteConfirmTimeout);
+        deleteConfirmTimeout = null;
+    }
+    
     debugLog('Edit form hidden');
 }
 
@@ -1020,7 +1060,7 @@ if (saveBtn) {
         
         // Refresh events list and calendar
         await loadCalendarEventsForMonth(currentDisplayDate);
-        showTodaysEvents();
+        showSelectedDateEvents();
         
         // Hide edit form
         hideEditForm();
@@ -1049,10 +1089,94 @@ if (saveBtn) {
     }
 }
 
+// Delete event function
+async function deleteEvent() {
+    if (!currentEditingEvent) {
+        debugLog('❌ No event selected for deletion', 'error');
+        return;
+    }
+    
+    const deleteBtn = document.getElementById('delete-event-btn');
+    if (!deleteBtn) return;
+    
+    try {
+        // Disable button during deletion
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = 'Deleting...';
+        
+        debugLog(`🗑️ Deleting event: ${currentEditingEvent.id}`);
+        
+        // Make API call to delete event
+        await gapi.client.calendar.events.delete({
+            calendarId: 'primary',
+            eventId: currentEditingEvent.id
+        });
+        
+        debugLog('✅ Event deleted successfully!');
+        
+        // Refresh events list and calendar
+        await loadCalendarEventsForMonth(currentDisplayDate);
+        showSelectedDateEvents();
+        
+        // Hide edit form
+        hideEditForm();
+        
+    } catch (error) {
+        debugLog(`Error deleting event: ${error.message || error}`, 'error');
+        
+        // Handle authentication errors
+        if (error.status === 401 || error.status === 403) {
+            debugLog('Authentication expired during event deletion, clearing stored token');
+            clearTokenStorage();
+            debugLog('⚠️ Authentication expired. Please sign in again.', 'warn');
+            handleSignoutClick();
+        } else {
+            debugLog(`❌ Failed to delete event: ${error.message || 'Unknown error'}`, 'error');
+        }
+        
+        // Reset button state on error
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = 'Delete Event';
+        deleteBtn.classList.remove('confirm-mode');
+    }
+}
+
+// Handle delete button click with confirmation
+let deleteConfirmTimeout = null;
+function handleDeleteClick() {
+    const deleteBtn = document.getElementById('delete-event-btn');
+    if (!deleteBtn) return;
+    
+    // If already in confirm mode, proceed with deletion
+    if (deleteBtn.classList.contains('confirm-mode')) {
+        deleteEvent();
+        return;
+    }
+    
+    // Switch to confirm mode
+    deleteBtn.classList.add('confirm-mode');
+    deleteBtn.textContent = 'Are you sure?';
+    
+    // Clear any existing timeout
+    if (deleteConfirmTimeout) {
+        clearTimeout(deleteConfirmTimeout);
+    }
+    
+    // Reset to normal after 3 seconds if no second click
+    deleteConfirmTimeout = setTimeout(() => {
+        deleteBtn.classList.remove('confirm-mode');
+        deleteBtn.textContent = 'Delete Event';
+        deleteConfirmTimeout = null;
+    }, 3000);
+}
+
 // Event listeners for edit form
 document.addEventListener('DOMContentLoaded', () => {
     // Save button
     document.getElementById('save-event-btn').addEventListener('click', saveEventChanges);
+    
+    // Delete button
+    document.getElementById('delete-event-btn').addEventListener('click', handleDeleteClick);
     
     // Cancel button
     document.getElementById('cancel-edit-btn').addEventListener('click', hideEditForm);

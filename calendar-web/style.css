@@ -234,6 +234,30 @@ body {
     color: var(--text-primary);
 }
 
+.btn-danger {
+    background: #dc3545;
+    color: white;
+    border: 1px solid #dc3545;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    border-color: #bd2130;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-danger.confirm-mode {
+    background: #a71e2a;
+    animation: pulse-danger 0.5s ease-in-out;
+}
+
+@keyframes pulse-danger {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
 .btn:disabled, #login-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -895,6 +919,16 @@ body {
     border-image: linear-gradient(45deg, #ff4081, #ff6d00, #c6ff00, #1de9b6, #448aff, #7c4dff) 1;
     color: #000000 !important;
     font-weight: bold;
+}
+
+[data-theme="colorful"] .btn-danger {
+    background: linear-gradient(45deg, #ff0040, #ff4060, #ff6080, #ff80a0, #ffa0c0, #ffc0e0) !important;
+    background-size: 400% 400%;
+    animation: rainbow-bg 1.5s ease infinite;
+    border: 2px solid #ffffff;
+    color: #ffffff !important;
+    text-shadow: 0 0 8px rgba(255, 0, 64, 0.8);
+    box-shadow: 0 0 20px rgba(255, 0, 64, 0.5);
 }
 
 [data-theme="colorful"] .nav-btn {
