@@ -276,6 +276,7 @@ body {
     max-width: 1400px;
     margin: 0 auto;
     min-height: calc(100vh - 120px);
+    transition: grid-template-columns 0.3s ease;
 }
 
 /* Panel Styles */
@@ -1223,6 +1224,12 @@ body {
     .dashboard {
         grid-template-columns: 300px 1fr;
         gap: 1rem;
+    }
+    
+    /* For week/day view on smaller screens, make calendar panel full width */
+    .dashboard.week-view-mode,
+    .dashboard.day-view-mode {
+        grid-template-columns: 1fr 300px;
     }
     
     .editor-panel {

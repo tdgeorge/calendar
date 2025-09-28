@@ -253,6 +253,7 @@ function setViewMode(newMode) {
     
     // Update UI to reflect new view mode
     updateViewSwitcher();
+    updatePanelVisibility(); // Ensure panel visibility is correct
     renderCurrentView();
 }
 
@@ -283,6 +284,9 @@ function updateViewSwitcher() {
 function renderCurrentView() {
     debugLog(`🖼️ Rendering ${currentViewMode} view`);
     
+    // Manage panel visibility based on view mode
+    updatePanelVisibility();
+    
     switch (currentViewMode) {
         case VIEW_MODES.MONTH:
             renderMonthView();
@@ -296,6 +300,34 @@ function renderCurrentView() {
         default:
             debugLog(`❌ Unknown view mode: ${currentViewMode}`, 'error');
             renderMonthView(); // Fallback to month view
+    }
+}
+
+function updatePanelVisibility() {
+    const eventsPanel = document.querySelector('.events-panel');
+    const calendarPanel = document.querySelector('.calendar-panel');
+    const dashboard = document.getElementById('dashboard');
+    
+    if (!eventsPanel || !calendarPanel || !dashboard) {
+        debugLog('❌ Panel elements not found', 'error');
+        return;
+    }
+    
+    // Remove existing view mode classes
+    dashboard.classList.remove('month-view-mode', 'week-view-mode', 'day-view-mode');
+    
+    if (currentViewMode === VIEW_MODES.MONTH) {
+        // Month view: show events panel, normal 3-column layout
+        eventsPanel.style.display = 'flex';
+        dashboard.style.gridTemplateColumns = '350px 1fr 350px';
+        dashboard.classList.add('month-view-mode');
+        debugLog('📅 Month view: 3-column layout with events panel');
+    } else {
+        // Week/Day view: hide events panel, expand calendar panel
+        eventsPanel.style.display = 'none';
+        dashboard.style.gridTemplateColumns = '1fr 350px';
+        dashboard.classList.add(`${currentViewMode}-view-mode`);
+        debugLog(`📊 ${currentViewMode} view: 2-column layout, events panel hidden`);
     }
 }
 
@@ -574,6 +606,8 @@ if (nextMonthBtn) {
 }
 
 function navigatePrevious() {
+    const originalViewMode = currentViewMode; // Preserve view mode
+    
     switch (currentViewMode) {
         case VIEW_MODES.MONTH:
             currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1);
@@ -586,6 +620,9 @@ function navigatePrevious() {
             break;
     }
     
+    // Ensure view mode is preserved
+    currentViewMode = originalViewMode;
+    
     renderCurrentView();
     if (accessToken) {
         loadCalendarEventsForMonth(currentDisplayDate);
@@ -595,6 +632,8 @@ function navigatePrevious() {
 }
 
 function navigateNext() {
+    const originalViewMode = currentViewMode; // Preserve view mode
+    
     switch (currentViewMode) {
         case VIEW_MODES.MONTH:
             currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1);
@@ -606,6 +645,9 @@ function navigateNext() {
             currentDisplayDate.setDate(currentDisplayDate.getDate() + 1);
             break;
     }
+    
+    // Ensure view mode is preserved
+    currentViewMode = originalViewMode;
     
     renderCurrentView();
     if (accessToken) {
@@ -721,6 +763,9 @@ async function showCalendar() {
     if (userSection) userSection.style.display = 'flex';
     if (dashboard) dashboard.style.display = 'grid';
     currentDisplayDate = new Date(); // Reset to current month when showing calendar
+    
+    // Ensure panel visibility is correct for the current view mode
+    updatePanelVisibility();
     renderCurrentView(); // Use the new view system instead of direct renderCalendar
     
     // Load events for calendar coloring and initial display
