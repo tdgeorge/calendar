@@ -271,7 +271,7 @@ function saveViewToStorage(viewMode) {
     }
 }
 
-function setViewMode(newMode) {
+async function setViewMode(newMode) {
     if (!Object.values(VIEW_MODES).includes(newMode)) {
         debugLog(`❌ Invalid view mode: ${newMode}`, 'error');
         return;
@@ -287,8 +287,35 @@ function setViewMode(newMode) {
     updateViewSwitcher();
     updatePanelVisibility(); // Ensure panel visibility is correct
     
-    // Re-render with current data (events should already be loaded)
-    renderCurrentView();
+    // Check if we need to reload events for the new view mode
+    const needsReload = shouldReloadEventsForViewChange(oldMode, newMode);
+    
+    if (needsReload && accessToken) {
+        debugLog(`🔄 Reloading events for view change: ${oldMode} → ${newMode}`);
+        // Reload events for the new view's date range
+        await loadCalendarEventsForMonth(currentDisplayDate);
+    } else {
+        debugLog(`📋 Using existing events for view change: ${oldMode} → ${newMode}`);
+        // Just re-render with existing data
+        renderCurrentView();
+    }
+}
+
+function shouldReloadEventsForViewChange(oldMode, newMode) {
+    // Define which view changes require reloading events due to different date ranges:
+    const reloadCases = [
+        // Day → Week/Month: Day view only loads single day, need broader range
+        oldMode === VIEW_MODES.DAY && (newMode === VIEW_MODES.WEEK || newMode === VIEW_MODES.MONTH),
+        
+        // Week → Month: Week view only loads 7 days, month needs full month
+        oldMode === VIEW_MODES.WEEK && newMode === VIEW_MODES.MONTH,
+        
+        // Month → Day/Week: Month has broad range, but focused views need precise range
+        // (especially for cross-month weeks or specific day focus)
+        oldMode === VIEW_MODES.MONTH && (newMode === VIEW_MODES.DAY || newMode === VIEW_MODES.WEEK)
+    ];
+    
+    return reloadCases.some(condition => condition);
 }
 
 function updateViewSwitcher() {
