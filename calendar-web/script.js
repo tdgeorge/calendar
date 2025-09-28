@@ -59,6 +59,99 @@ function formatDateForCalendar(date) {
     return `${year}-${month}-${day}`;
 }
 
+// Theme Management
+const THEME_STORAGE_KEY = 'calendar_theme_preference';
+
+function getThemeFromStorage() {
+    try {
+        return localStorage.getItem(THEME_STORAGE_KEY) || 'dark'; // Default to dark mode
+    } catch (error) {
+        debugLog(`Failed to get theme from localStorage: ${error.message}`, 'warn');
+        return 'dark';
+    }
+}
+
+function saveThemeToStorage(theme) {
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+        debugLog(`✅ Theme saved to localStorage: ${theme}`);
+    } catch (error) {
+        debugLog(`❌ Failed to save theme to localStorage: ${error.message}`, 'error');
+    }
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = document.querySelector('.theme-toggle-icon');
+    const themeText = document.querySelector('.theme-toggle-text');
+    
+    if (themeToggle && themeIcon && themeText) {
+        if (theme === 'dark') {
+            themeIcon.textContent = '🌙';
+            themeText.textContent = 'Dark';
+        } else if (theme === 'colorful') {
+            themeIcon.textContent = '🌈';
+            themeText.textContent = 'Colorful';
+        } else {
+            themeIcon.textContent = '☀️';
+            themeText.textContent = 'Light';
+        }
+    }
+    
+    debugLog(`🎨 Applied ${theme} theme`);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    let newTheme;
+    
+    // Normal toggle between dark and light (skip colorful in normal cycle)
+    if (currentTheme === 'dark') {
+        newTheme = 'light';
+    } else if (currentTheme === 'light') {
+        newTheme = 'dark';
+    } else if (currentTheme === 'colorful') {
+        // If we're in colorful mode, go to dark
+        newTheme = 'dark';
+    }
+    
+    applyTheme(newTheme);
+    saveThemeToStorage(newTheme);
+    
+    debugLog(`🔄 Toggled theme from ${currentTheme} to ${newTheme}`);
+}
+
+function activateSecretTheme() {
+    applyTheme('colorful');
+    saveThemeToStorage('colorful');
+    debugLog('🌈✨ Secret colorful theme activated!');
+}
+
+// Initialize theme
+function initializeTheme() {
+    const savedTheme = getThemeFromStorage();
+    applyTheme(savedTheme);
+    
+    // Add event listeners for theme toggle
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        // Single click for normal theme toggle
+        themeToggle.addEventListener('click', toggleTheme);
+        
+        // Double click for secret colorful theme
+        themeToggle.addEventListener('dblclick', (e) => {
+            e.preventDefault(); // Prevent double execution of single click
+            activateSecretTheme();
+        });
+        
+        debugLog('🎨 Theme toggle initialized with secret double-click feature');
+    } else {
+        debugLog('❌ Theme toggle button not found', 'error');
+    }
+}
+
 // DOM element references with null checks
 function getElement(id, required = true) {
     const element = document.getElementById(id);
@@ -138,8 +231,16 @@ if (nextMonthBtn) {
     };
 }
 
-// Initialize login button
+// Initialize login button and UI state
 updateLoginButton('Loading...', null, true);
+
+// Set initial UI state - show login section, hide dashboard and user section
+if (loginSection) loginSection.style.display = 'block';
+if (userSection) userSection.style.display = 'none';
+if (dashboard) dashboard.style.display = 'none';
+
+// Initialize theme
+initializeTheme();
 
 debugLog('Calendar app initialized');
 
@@ -158,6 +259,8 @@ async function loadConfig() {
         if (!CLIENT_ID || !API_KEY) {
             debugLog('Missing CLIENT_ID or API_KEY from server config', 'error');
             updateLoginButton('Config Error', null, true);
+            // Ensure login section is visible on error
+            if (loginSection) loginSection.style.display = 'block';
             return false;
         }
         
@@ -165,6 +268,8 @@ async function loadConfig() {
     } catch (error) {
         debugLog(`Failed to load config: ${error.message}`, 'error');
         updateLoginButton('Config Load Error', null, true);
+        // Ensure login section is visible on error
+        if (loginSection) loginSection.style.display = 'block';
         return false;
     }
 }
@@ -421,6 +526,10 @@ async function maybeEnableButtons() {
         } else {
             debugLog('No valid stored token, showing login button');
             updateLoginButton('Login with Google', handleAuthClick, false);
+            // Ensure login section is visible and dashboard is hidden
+            if (loginSection) loginSection.style.display = 'block';
+            if (userSection) userSection.style.display = 'none';
+            if (dashboard) dashboard.style.display = 'none';
         }
     } else {
         debugLog(`Still waiting - GAPI: ${gapiInited ? 'Ready' : 'Loading'}, GIS: ${gisInited ? 'Ready' : 'Loading'}`);
