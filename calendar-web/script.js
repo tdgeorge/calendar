@@ -1402,22 +1402,45 @@ initializeViewMode();
 
 debugLog('Calendar app initialized');
 
-// Load configuration from server
+// Load configuration - handles both development (server.py) and production (GitHub Pages)
 async function loadConfig() {
     try {
-        debugLog('Loading config from server...');
-        const response = await fetch('/api/config');
-        const config = await response.json();
+        debugLog('Loading config...');
         
-        CLIENT_ID = config.clientId;
-        API_KEY = config.apiKey;
+        // Try to load from server first (development with server.py)
+        try {
+            const response = await fetch('/api/config');
+            if (response.ok) {
+                const config = await response.json();
+                CLIENT_ID = config.clientId;
+                API_KEY = config.apiKey;
+                debugLog('Config loaded from development server');
+            } else {
+                throw new Error('Server config not available');
+            }
+        } catch (serverError) {
+            // Fallback to static config file (production on GitHub Pages)
+            debugLog('Server config not available, trying static config...');
+            try {
+                const response = await fetch('./api/config.json');
+                if (response.ok) {
+                    const config = await response.json();
+                    CLIENT_ID = config.CLIENT_ID;
+                    API_KEY = config.API_KEY;
+                    debugLog('Config loaded from static file (GitHub Pages)');
+                } else {
+                    throw new Error('Static config not available');
+                }
+            } catch (staticError) {
+                throw new Error(`Both server (${serverError.message}) and static (${staticError.message}) config failed`);
+            }
+        }
         
         debugLog(`Config loaded - Client ID: ${CLIENT_ID ? 'Set' : 'Not set'}, API Key: ${API_KEY ? 'Set' : 'Not set'}`);
         
         if (!CLIENT_ID || !API_KEY) {
-            debugLog('Missing CLIENT_ID or API_KEY from server config', 'error');
+            debugLog('Missing CLIENT_ID or API_KEY from config', 'error');
             updateLoginButton('Config Error', null, true);
-            // Ensure login section is visible on error
             if (loginSection) loginSection.style.display = 'block';
             return false;
         }
@@ -1426,7 +1449,6 @@ async function loadConfig() {
     } catch (error) {
         debugLog(`Failed to load config: ${error.message}`, 'error');
         updateLoginButton('Config Load Error', null, true);
-        // Ensure login section is visible on error
         if (loginSection) loginSection.style.display = 'block';
         return false;
     }

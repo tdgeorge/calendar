@@ -21,13 +21,35 @@ A simple slideshow application built with Tkinter.
 
 ## Getting Started
 
-### Quick Start (Calendar Web App)
+### 🌐 GitHub Pages Deployment (Recommended)
+
+This calendar app can be automatically deployed to GitHub Pages with secure API key management:
+
+1. **Fork or use this repository**
+2. **Add your Google API credentials as GitHub Secrets:**
+   - Go to **Settings** → **Secrets and variables** → **Actions**
+   - Add `GOOGLE_CLIENT_ID` (your OAuth 2.0 Client ID)
+   - Add `GOOGLE_API_KEY` (your Google Calendar API Key)
+3. **Enable GitHub Pages:**
+   - Go to **Settings** → **Pages**
+   - Source: **GitHub Actions**
+4. **Push to main branch** - GitHub Actions will build and deploy automatically!
+
+### 🛠️ Local Development
+
 ```bash
-cd calendar-web
-cp start-server-example.sh start-server.sh
-# Edit start-server.sh with your Google credentials
-chmod +x start-server.sh
-./start-server.sh
+# Set environment variables
+export GOOGLE_CLIENT_ID='your-client-id'
+export GOOGLE_API_KEY='your-api-key'
+
+# Start development server
+./dev-server.sh
+```
+
+Or create a `.env` file:
+```
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_API_KEY=your-api-key
 ```
 
 ### Detailed Setup Instructions
