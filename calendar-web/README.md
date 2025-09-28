@@ -5,7 +5,7 @@ A modern web application that integrates with Google Calendar API using the late
 ## Features
 
 - 📅 Interactive calendar display
-- 🔐 Secure Google OAuth2 authentication using Google Identity Services
+- 🔐 Secure Google OAuth2 authentication with session persistence
 - 📋 View upcoming events from Google Calendar
 - ✏️ Edit event details (title, description, time, duration)
 - 💾 Save changes back to Google Calendar
@@ -162,6 +162,7 @@ This application uses the modern **Google Identity Services (GIS)** library, fol
 1. **Separate Authentication & API Access**: GIS handles authentication, GAPI handles API calls
 2. **No Deprecated Libraries**: Does not use the deprecated `gapi.auth2` library
 3. **Secure Token Management**: Access tokens are managed securely and set manually on API clients
+4. **Session Persistence**: Authentication tokens are safely stored in localStorage and automatically restored on page refresh
 
 ## Debug Console
 
@@ -200,6 +201,12 @@ Use this console to troubleshoot any issues with authentication or API calls.
 - The app requires `https://www.googleapis.com/auth/calendar` scope (not just readonly)
 - Sign out and sign back in to grant new permissions
 - Check OAuth consent screen configuration
+
+**Session/Authentication Issues**
+- If authentication seems stuck, try clearing browser localStorage
+- Sessions automatically expire after 1 hour for security
+- Page refreshes should maintain authentication automatically
+- Clear browser cache if experiencing persistent login issues
 
 **Environment Variables Not Set**
 - The server will show "Not set" for missing credentials

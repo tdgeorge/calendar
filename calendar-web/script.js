@@ -162,6 +162,67 @@ let gisInited = false;
 let gapiInited = false;
 let accessToken = null;
 
+// Token persistence configuration
+const TOKEN_STORAGE_KEY = 'google_calendar_access_token';
+const TOKEN_EXPIRY_KEY = 'google_calendar_token_expiry';
+
+// Token management functions
+function saveTokenToStorage(token, expiresIn) {
+    debugLog(`saveTokenToStorage called with expiresIn: ${expiresIn}`);
+    try {
+        const expiryTime = Date.now() + (expiresIn * 1000); // Convert to milliseconds
+        localStorage.setItem(TOKEN_STORAGE_KEY, token);
+        localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
+        debugLog(`✅ Token saved to localStorage successfully!`);
+        debugLog(`📅 Token expires at: ${new Date(expiryTime).toLocaleString()}`);
+        debugLog(`⏰ Token valid for ${Math.round(expiresIn / 60)} minutes`);
+    } catch (error) {
+        debugLog(`❌ Failed to save token to localStorage: ${error.message}`, 'error');
+    }
+}
+
+function getTokenFromStorage() {
+    debugLog('🔍 Checking for stored authentication token...');
+    try {
+        const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+        const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
+        
+        if (!token || !expiry) {
+            debugLog('❌ No stored token found in localStorage');
+            return null;
+        }
+        
+        const expiryTime = parseInt(expiry);
+        const now = Date.now();
+        
+        debugLog(`📅 Token found, checking expiry: ${new Date(expiryTime).toLocaleString()}`);
+        
+        if (now >= expiryTime) {
+            debugLog('⏰ Stored token has expired, clearing storage');
+            clearTokenStorage();
+            return null;
+        }
+        
+        const timeLeft = Math.round((expiryTime - now) / 1000 / 60); // minutes
+        debugLog(`✅ Found valid stored token, expires in ${timeLeft} minutes`);
+        return token;
+    } catch (error) {
+        debugLog(`❌ Failed to retrieve token from localStorage: ${error.message}`, 'error');
+        return null;
+    }
+}
+
+function clearTokenStorage() {
+    debugLog('🧹 Clearing token storage...');
+    try {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        localStorage.removeItem(TOKEN_EXPIRY_KEY);
+        debugLog('✅ Token storage cleared successfully');
+    } catch (error) {
+        debugLog(`❌ Failed to clear token storage: ${error.message}`, 'error');
+    }
+}
+
 async function initializeGapi() {
     debugLog('Initializing Google API client (GAPI only, no auth)...');
     debugLog(`API Key: ${API_KEY ? 'Set (' + API_KEY.substring(0, 10) + '...)' : 'Not set'}`);
@@ -223,6 +284,11 @@ function gisLoaded() {
                 accessToken = response.access_token;
                 debugLog('Access token received successfully');
                 
+                // Save token to localStorage with expiry (default 1 hour if not specified)
+                const expiresIn = response.expires_in || 3600;
+                debugLog(`Token expires in ${expiresIn} seconds`);
+                saveTokenToStorage(accessToken, expiresIn);
+                
                 // Set the token for gapi.client
                 gapi.client.setToken({
                     access_token: accessToken
@@ -248,19 +314,45 @@ function maybeEnableButtons() {
     
     if (gapiInited && gisInited) {
         debugLog('Both GAPI and GIS initialized successfully');
-        debugLog('Enabling login button');
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Login with Google';
-        loginBtn.onclick = handleAuthClick;
+        
+        // Try to restore previous authentication
+        debugLog('🔄 Attempting to restore previous authentication...');
+        const storedToken = getTokenFromStorage();
+        if (storedToken) {
+            debugLog('🎉 Restoring previous authentication session');
+            accessToken = storedToken;
+            
+            // Set the token for gapi.client
+            gapi.client.setToken({
+                access_token: accessToken
+            });
+            
+            // Show calendar interface
+            showCalendar();
+            listUpcomingEvents();
+            
+            // Update login button to show sign out option
+            loginBtn.textContent = 'Sign Out';
+            loginBtn.onclick = handleSignoutClick;
+            loginBtn.disabled = false;
+            
+            // Show restoration message
+            debugLog('Successfully restored authentication from stored token');
+        } else {
+            debugLog('No valid stored token, showing login button');
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Login with Google';
+            loginBtn.onclick = handleAuthClick;
+        }
     } else {
         debugLog(`Still waiting - GAPI: ${gapiInited ? 'Ready' : 'Loading'}, GIS: ${gisInited ? 'Ready' : 'Loading'}`);
     }
 }
 
 function handleAuthClick() {
-    debugLog('Login button clicked');
+    debugLog('Login/Auth button clicked');
     
-    // Check if user is already authenticated
+    // Check if user is already authenticated (this should not happen with proper UI state)
     if (accessToken && gapi.client.getToken()) {
         debugLog('User already authenticated, showing calendar');
         showCalendar();
@@ -371,6 +463,8 @@ async function listUpcomingEvents() {
         debugLog(`Error fetching events: ${err.message || err}`, 'error');
         
         if (err.status === 401 || err.status === 403) {
+            debugLog('Authentication expired, clearing stored token');
+            clearTokenStorage();
             eventsDiv.innerHTML = 'Authentication expired. Please sign in again.';
             handleSignoutClick();
         } else {
@@ -453,17 +547,19 @@ function handleSignoutClick() {
             debugLog('Access token revoked');
         });
         
-        // Clear stored token
+        // Clear stored tokens
         accessToken = null;
         gapi.client.setToken(null);
+        clearTokenStorage();
         
         // Reset UI
         loginSection.style.display = 'block';
         calendarSection.style.display = 'none';
         eventsDiv.innerHTML = '';
         loginBtn.textContent = 'Login with Google';
+        loginBtn.onclick = handleAuthClick;
         
-        debugLog('User signed out successfully');
+        debugLog('User signed out successfully, storage cleared');
     }
 }
 
@@ -619,7 +715,16 @@ async function saveEventChanges() {
         
     } catch (error) {
         debugLog(`Error updating event: ${error.message || error}`, 'error');
-        alert(`Failed to update event: ${error.message || 'Unknown error'}`);
+        
+        // Handle authentication errors
+        if (error.status === 401 || error.status === 403) {
+            debugLog('Authentication expired during event save, clearing stored token');
+            clearTokenStorage();
+            alert('Authentication expired. Please sign in again.');
+            handleSignoutClick();
+        } else {
+            alert(`Failed to update event: ${error.message || 'Unknown error'}`);
+        }
     } finally {
         // Re-enable save button
         saveBtn.disabled = false;
