@@ -567,19 +567,179 @@ function createNewEventAtTime(dateStr, hour) {
 }
 
 function renderDayView() {
-    debugLog('📋 Rendering day view (placeholder)');
-    // TODO: Implement day view rendering
-    // For now, just show a placeholder message instead of falling back to month view
-    if (calendarTable) {
-        calendarTable.innerHTML = `
-            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
-                <h3>Day View</h3>
-                <p>Day view implementation coming soon!</p>
-                <p>Current date: ${currentDisplayDate.toLocaleDateString()}</p>
-            </div>
-        `;
+    debugLog('📋 Rendering day view');
+    
+    if (!calendarTable) {
+        debugLog('❌ Calendar table element not found', 'error');
+        return;
     }
+    
+    const currentDay = new Date(currentDisplayDate);
+    const dayEvents = eventsByDate[formatDateForCalendar(currentDay)] || [];
+    
+    // Create day view HTML structure
+    let html = '<div class="day-view">';
+    
+    // Day header
+    const isToday = isDateToday(currentDay);
+    const dayClass = isToday ? 'day-view-header today' : 'day-view-header';
+    
+    html += `<div class="${dayClass}">`;
+    html += `<div class="day-title">${currentDay.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>`;
+    if (dayEvents.length > 0) {
+        html += `<div class="day-event-count">${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}</div>`;
+    } else {
+        html += `<div class="day-event-count">No events</div>`;
+    }
+    html += '</div>';
+    
+    // Time slots from 6 AM to 10 PM with 30-minute intervals for more detail
+    const startHour = 6;
+    const endHour = 22;
+    const intervalMinutes = 30;
+    
+    html += '<div class="day-content">';
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
+        for (let minutes = 0; minutes < 60; minutes += intervalMinutes) {
+            const timeString = formatDayViewTime(hour, minutes);
+            const timeSlotId = `${formatDateForCalendar(currentDay)}-${hour}-${minutes}`;
+            
+            html += '<div class="day-time-row">';
+            
+            // Only show time label for the top of each hour
+            if (minutes === 0) {
+                html += `<div class="day-time-label full">${formatHour(hour)}</div>`;
+            } else {
+                html += `<div class="day-time-label half"></div>`;
+            }
+            
+            html += `<div class="day-time-slot" data-date="${formatDateForCalendar(currentDay)}" data-hour="${hour}" data-minutes="${minutes}" data-time-slot="${timeSlotId}">`;
+            html += renderEventsForDayTimeSlot(formatDateForCalendar(currentDay), hour, minutes);
+            html += '</div>';
+            
+            html += '</div>';
+        }
+    }
+    
+    html += '</div>';
+    html += '</div>';
+    
+    calendarTable.innerHTML = html;
+    
+    // Add click handlers for time slots
+    addDayViewEventHandlers();
+    
     updateHeaderText();
+}
+
+function formatDayViewTime(hour, minutes) {
+    const hourStr = hour === 0 ? '12' : hour > 12 ? (hour - 12).toString() : hour.toString();
+    const minuteStr = minutes.toString().padStart(2, '0');
+    const period = hour < 12 ? 'AM' : 'PM';
+    return `${hourStr}:${minuteStr} ${period}`;
+}
+
+function renderEventsForDayTimeSlot(dateStr, hour, minutes) {
+    const dayEvents = eventsByDate[dateStr] || [];
+    let html = '';
+    
+    dayEvents.forEach(event => {
+        if (event.start.dateTime) {
+            const startTime = new Date(event.start.dateTime);
+            const eventHour = startTime.getHours();
+            const eventMinutes = startTime.getMinutes();
+            
+            // Check if event starts in this time slot (30-minute intervals)
+            if (eventHour === hour && eventMinutes >= minutes && eventMinutes < (minutes + 30)) {
+                const endTime = new Date(event.end.dateTime);
+                const durationMinutes = (endTime - startTime) / (1000 * 60);
+                
+                // Calculate precise positioning within the 30-minute slot
+                const slotOffset = ((eventMinutes - minutes) / 30) * 100; // Percentage within the slot
+                const height = Math.max((durationMinutes / 30) * 60, 25); // Height based on duration, minimum 25px
+                
+                html += `<div class="day-event" 
+                         data-event-id="${event.id}"
+                         style="top: ${slotOffset}%; height: ${height}px; position: absolute; width: 95%; left: 2.5%;"
+                         title="${event.summary}">`;
+                html += `<div class="event-title">${event.summary}</div>`;
+                html += `<div class="event-time">${formatTimeForInput(event.start.dateTime)} - ${formatTimeForInput(event.end.dateTime)}</div>`;
+                if (event.description) {
+                    html += `<div class="event-description">${event.description.substring(0, 50)}${event.description.length > 50 ? '...' : ''}</div>`;
+                }
+                html += '</div>';
+            }
+        } else {
+            // All-day event - show at the top of the first time slot (6:00 AM)
+            if (hour === 6 && minutes === 0) {
+                html += `<div class="day-event all-day" 
+                         data-event-id="${event.id}"
+                         style="position: absolute; width: 95%; left: 2.5%; top: 0; height: 25px;"
+                         title="${event.summary}">`;
+                html += `<div class="event-title">🗓️ ${event.summary}</div>`;
+                html += '</div>';
+            }
+        }
+    });
+    
+    return html;
+}
+
+function addDayViewEventHandlers() {
+    // Add click handlers for time slots to create events
+    document.querySelectorAll('.day-time-slot').forEach(slot => {
+        slot.addEventListener('click', (e) => {
+            // Don't create event if clicking on an existing event
+            if (e.target.closest('.day-event')) return;
+            
+            const dateStr = slot.getAttribute('data-date');
+            const hour = parseInt(slot.getAttribute('data-hour'));
+            const minutes = parseInt(slot.getAttribute('data-minutes'));
+            
+            debugLog(`🕐 Day time slot clicked: ${dateStr} at ${hour}:${minutes.toString().padStart(2, '0')}`);
+            
+            // Set selected date and create new event with specific time
+            window.selectedDate = dateStr;
+            createNewEventAtDayTime(dateStr, hour, minutes);
+        });
+    });
+    
+    // Add click handlers for existing events
+    document.querySelectorAll('.day-event').forEach(eventEl => {
+        eventEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const eventId = eventEl.getAttribute('data-event-id');
+            debugLog(`📅 Day event clicked: ${eventId}`);
+            editEvent(eventId);
+        });
+    });
+}
+
+function createNewEventAtDayTime(dateStr, hour, minutes) {
+    debugLog(`Creating new event for ${dateStr} at ${hour}:${minutes.toString().padStart(2, '0')}`);
+    
+    isCreatingNewEvent = true;
+    currentEditingEvent = null;
+    
+    // Create a blank event object for the selected date and time
+    const startTime = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    const endHour = minutes >= 30 ? hour + 1 : hour;
+    const endMinutes = minutes >= 30 ? 0 : minutes + 30;
+    const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+    
+    const newEvent = {
+        summary: '',
+        description: '',
+        start: {
+            dateTime: createLocalDateTime(dateStr, startTime).toISOString()
+        },
+        end: {
+            dateTime: createLocalDateTime(dateStr, endTime).toISOString()
+        }
+    };
+    
+    showEditForm(newEvent, true);
 }
 
 // Debug logging function

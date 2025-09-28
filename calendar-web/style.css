@@ -590,6 +590,166 @@ body {
     margin-top: 0.125rem;
 }
 
+/* Day View Styles */
+.day-view {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.day-view-header {
+    background: var(--bg-secondary);
+    padding: 1.5rem;
+    text-align: center;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 2px solid var(--border-primary);
+    margin-bottom: 1px;
+}
+
+.day-view-header.today {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+}
+
+.day-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.day-event-count {
+    font-size: 0.875rem;
+    opacity: 0.8;
+    font-weight: 500;
+}
+
+.day-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-primary);
+    border-radius: 0 0 8px 8px;
+    overflow-y: auto;
+    max-height: 700px;
+}
+
+.day-time-row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    min-height: 40px;
+    border-bottom: 1px solid var(--border-secondary);
+    position: relative;
+}
+
+.day-time-row:last-child {
+    border-bottom: none;
+}
+
+.day-time-label {
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-right: 2px solid var(--border-primary);
+    padding: 0.5rem;
+    position: relative;
+}
+
+.day-time-label.full {
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.day-time-label.half {
+    border-top: 1px dashed var(--border-secondary);
+    font-size: 0.65rem;
+    opacity: 0.6;
+}
+
+.day-time-label.half::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--border-secondary);
+}
+
+.day-time-slot {
+    position: relative;
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 40px;
+    padding: 0.25rem;
+}
+
+.day-time-slot:hover {
+    background: var(--button-hover);
+}
+
+.day-time-slot:nth-child(even) {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="dark"] .day-time-slot:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Day Event Styles */
+.day-event {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin: 1px 0;
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    box-shadow: 0 2px 4px var(--shadow-light);
+    transition: all 0.2s ease;
+    z-index: 2;
+    overflow: hidden;
+}
+
+.day-event:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 4px 8px var(--shadow-medium);
+    z-index: 3;
+}
+
+.day-event.all-day {
+    background: var(--accent-secondary);
+    font-style: italic;
+    border: 2px dashed var(--border-primary);
+}
+
+.day-event .event-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.day-event .event-time {
+    font-size: 0.65rem;
+    opacity: 0.9;
+    margin-bottom: 0.25rem;
+}
+
+.day-event .event-description {
+    font-size: 0.65rem;
+    opacity: 0.8;
+    line-height: 1.2;
+    margin-top: 0.25rem;
+}
+
 /* Navigation Buttons */
 .nav-btn {
     background: none;
@@ -1217,6 +1377,86 @@ body {
     animation: rainbow-bg 3s ease infinite;
     color: #000000 !important;
     text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="colorful"] .day-view-header {
+    background: linear-gradient(135deg, rgba(255, 64, 129, 0.9), rgba(255, 171, 64, 0.9), rgba(212, 255, 128, 0.9), rgba(128, 255, 166, 0.9)) !important;
+    background-size: 400% 400%;
+    animation: rainbow-bg 3s ease infinite;
+    color: #000000 !important;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+    border-bottom: 3px solid;
+    border-image: linear-gradient(90deg, #ff4081, #ff6d00, #c6ff00, #1de9b6, #448aff, #7c4dff) 1;
+}
+
+[data-theme="colorful"] .day-view-header.today {
+    background: linear-gradient(45deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff, #06ffa5) !important;
+    background-size: 400% 400%;
+    animation: rainbow-bg 1.5s ease infinite;
+    color: #ffffff !important;
+    text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+    border: 3px solid #ffffff;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="colorful"] .day-title {
+    background: linear-gradient(45deg, #d500f9, #ff1744, #ff9800, #64dd17, #00e676, #2979ff, #d500f9);
+    background-size: 200% 200%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: rainbow-text 2s ease infinite;
+}
+
+[data-theme="colorful"] .day-time-label {
+    background: linear-gradient(90deg, rgba(255, 179, 230, 0.7), rgba(255, 204, 153, 0.7), rgba(230, 255, 204, 0.7)) !important;
+    background-size: 300% 300%;
+    animation: rainbow-bg 4s ease infinite;
+    color: #000000 !important;
+    font-weight: bold;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="colorful"] .day-time-slot {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 249, 250, 0.95)) !important;
+    border-right: 1px solid;
+    border-image: linear-gradient(180deg, #ff4081, #ffab40, #d4ff80, #80ffa6) 1;
+}
+
+[data-theme="colorful"] .day-time-slot:hover {
+    background: linear-gradient(135deg, rgba(255, 179, 230, 0.4), rgba(255, 204, 153, 0.4), rgba(230, 255, 204, 0.4)) !important;
+    background-size: 200% 200%;
+    animation: rainbow-bg 2s ease infinite;
+}
+
+[data-theme="colorful"] .day-time-slot:nth-child(even) {
+    background: linear-gradient(135deg, rgba(255, 200, 240, 0.3), rgba(255, 220, 180, 0.3)) !important;
+}
+
+[data-theme="colorful"] .day-event {
+    background: linear-gradient(45deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff, #06ffa5) !important;
+    background-size: 300% 300%;
+    animation: rainbow-bg 2.5s ease infinite;
+    color: #ffffff !important;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="colorful"] .day-event:hover {
+    animation: rainbow-glow 1s ease infinite;
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="colorful"] .day-event.all-day {
+    background: linear-gradient(90deg, #ffb3e6, #ffcc99, #e6ffcc, #ccffe6, #cce6ff, #e6ccff) !important;
+    background-size: 400% 400%;
+    animation: rainbow-bg 3s ease infinite;
+    color: #000000 !important;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+    border: 2px dashed #ffffff;
 }
 
 /* Responsive Design */
