@@ -346,11 +346,187 @@ function getWeekEnd(date) {
     return end;
 }
 
-// Placeholder functions for week and day views (to be implemented)
+// Week view implementation
 function renderWeekView() {
-    debugLog('📊 Rendering week view (placeholder)');
-    // TODO: Implement week view rendering
-    renderCalendar(currentDisplayDate); // Temporary fallback
+    debugLog('📊 Rendering week view');
+    
+    if (!calendarTable) {
+        debugLog('❌ Calendar table element not found', 'error');
+        return;
+    }
+    
+    const weekStart = getWeekStart(currentDisplayDate);
+    const weekDays = [];
+    
+    // Generate 7 days of the week
+    for (let i = 0; i < 7; i++) {
+        const day = new Date(weekStart);
+        day.setDate(weekStart.getDate() + i);
+        weekDays.push(day);
+    }
+    
+    // Create week view HTML structure
+    let html = '<div class="week-view">';
+    
+    // Header with days of the week
+    html += '<div class="week-header">';
+    html += '<div class="time-label"></div>'; // Empty corner
+    
+    weekDays.forEach(day => {
+        const isToday = isDateToday(day);
+        const dayClass = isToday ? 'week-day-header today' : 'week-day-header';
+        const dayName = day.toLocaleDateString('default', { weekday: 'short' });
+        const dayNumber = day.getDate();
+        
+        html += `<div class="${dayClass}" data-date="${formatDateForCalendar(day)}">`;
+        html += `<div class="day-name">${dayName}</div>`;
+        html += `<div class="day-number">${dayNumber}</div>`;
+        html += `</div>`;
+    });
+    html += '</div>';
+    
+    // Time slots from 6 AM to 10 PM
+    const startHour = 6;
+    const endHour = 22;
+    
+    html += '<div class="week-content">';
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
+        const timeString = formatHour(hour);
+        
+        html += '<div class="week-row">';
+        html += `<div class="time-label">${timeString}</div>`;
+        
+        weekDays.forEach(day => {
+            const dateStr = formatDateForCalendar(day);
+            const timeSlotId = `${dateStr}-${hour}`;
+            
+            html += `<div class="time-slot" data-date="${dateStr}" data-hour="${hour}" data-time-slot="${timeSlotId}">`;
+            html += renderEventsForTimeSlot(dateStr, hour);
+            html += '</div>';
+        });
+        
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    html += '</div>';
+    
+    calendarTable.innerHTML = html;
+    
+    // Add click handlers for time slots
+    addWeekViewEventHandlers();
+    
+    updateHeaderText();
+}
+
+function formatHour(hour) {
+    if (hour === 0) return '12 AM';
+    if (hour < 12) return `${hour} AM`;
+    if (hour === 12) return '12 PM';
+    return `${hour - 12} PM`;
+}
+
+function isDateToday(date) {
+    const today = new Date();
+    return date.getDate() === today.getDate() && 
+           date.getMonth() === today.getMonth() && 
+           date.getFullYear() === today.getFullYear();
+}
+
+function renderEventsForTimeSlot(dateStr, hour) {
+    const dayEvents = eventsByDate[dateStr] || [];
+    let html = '';
+    
+    dayEvents.forEach(event => {
+        if (event.start.dateTime) {
+            const startTime = new Date(event.start.dateTime);
+            const eventHour = startTime.getHours();
+            
+            // Check if event starts in this hour slot
+            if (eventHour === hour) {
+                const minutes = startTime.getMinutes();
+                const topOffset = (minutes / 60) * 100; // Percentage offset within the hour
+                
+                const endTime = new Date(event.end.dateTime);
+                const durationMinutes = (endTime - startTime) / (1000 * 60);
+                const height = Math.max((durationMinutes / 60) * 100, 20); // Minimum 20px height
+                
+                html += `<div class="week-event" 
+                         data-event-id="${event.id}"
+                         style="top: ${topOffset}%; height: ${height}px; position: absolute; width: 90%; left: 5%;"
+                         title="${event.summary}">`;
+                html += `<div class="event-title">${event.summary}</div>`;
+                html += `<div class="event-time">${formatTimeForInput(event.start.dateTime)}</div>`;
+                html += '</div>';
+            }
+        } else {
+            // All-day event - show at the top of the first hour (6 AM)
+            if (hour === 6) {
+                html += `<div class="week-event all-day" 
+                         data-event-id="${event.id}"
+                         style="position: absolute; width: 90%; left: 5%; top: 0; height: 20px;"
+                         title="${event.summary}">`;
+                html += `<div class="event-title">${event.summary}</div>`;
+                html += '</div>';
+            }
+        }
+    });
+    
+    return html;
+}
+
+function addWeekViewEventHandlers() {
+    // Add click handlers for time slots to create events
+    document.querySelectorAll('.time-slot').forEach(slot => {
+        slot.addEventListener('click', (e) => {
+            // Don't create event if clicking on an existing event
+            if (e.target.closest('.week-event')) return;
+            
+            const dateStr = slot.getAttribute('data-date');
+            const hour = parseInt(slot.getAttribute('data-hour'));
+            
+            debugLog(`🕐 Time slot clicked: ${dateStr} at ${hour}:00`);
+            
+            // Set selected date and create new event with specific time
+            window.selectedDate = dateStr;
+            createNewEventAtTime(dateStr, hour);
+        });
+    });
+    
+    // Add click handlers for existing events
+    document.querySelectorAll('.week-event').forEach(eventEl => {
+        eventEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const eventId = eventEl.getAttribute('data-event-id');
+            debugLog(`📅 Week event clicked: ${eventId}`);
+            editEvent(eventId);
+        });
+    });
+}
+
+function createNewEventAtTime(dateStr, hour) {
+    debugLog(`Creating new event for ${dateStr} at ${hour}:00`);
+    
+    isCreatingNewEvent = true;
+    currentEditingEvent = null;
+    
+    // Create a blank event object for the selected date and time
+    const startTime = `${String(hour).padStart(2, '0')}:00`;
+    const endTime = `${String(hour + 1).padStart(2, '0')}:00`;
+    
+    const newEvent = {
+        summary: '',
+        description: '',
+        start: {
+            dateTime: createLocalDateTime(dateStr, startTime).toISOString()
+        },
+        end: {
+            dateTime: createLocalDateTime(dateStr, endTime).toISOString()
+        }
+    };
+    
+    showEditForm(newEvent, true);
 }
 
 function renderDayView() {
@@ -1047,15 +1223,25 @@ function editEvent(eventId) {
     debugLog(`🖱️ Edit event clicked: ${eventId}`);
     debugLog(`📊 Current events available: ${window.currentEvents ? window.currentEvents.length : 'none'}`);
     
-    if (!window.currentEvents) {
-        debugLog('❌ No events available for editing', 'error');
-        return;
+    // For week view, we need to search across all events in eventsByDate
+    let event = null;
+    
+    if (window.currentEvents) {
+        event = window.currentEvents.find(e => e.id === eventId);
     }
     
-    const event = window.currentEvents.find(e => e.id === eventId);
+    // If not found in currentEvents, search in all eventsByDate
+    if (!event) {
+        debugLog('🔍 Event not found in currentEvents, searching all events...');
+        Object.values(eventsByDate).flat().forEach(e => {
+            if (e.id === eventId) {
+                event = e;
+            }
+        });
+    }
+    
     if (!event) {
         debugLog(`❌ Event not found: ${eventId}`, 'error');
-        debugLog(`Available event IDs: ${window.currentEvents.map(e => e.id).join(', ')}`);
         return;
     }
     
@@ -1269,6 +1455,9 @@ if (saveBtn) {
         
         // Refresh events list and calendar
         await loadCalendarEventsForMonth(currentDisplayDate);
+        
+        // Refresh the current view and show events
+        renderCurrentView();
         showSelectedDateEvents();
         
         // Hide edit form
@@ -1325,6 +1514,9 @@ async function deleteEvent() {
         
         // Refresh events list and calendar
         await loadCalendarEventsForMonth(currentDisplayDate);
+        
+        // Refresh the current view and show events
+        renderCurrentView();
         showSelectedDateEvents();
         
         // Hide edit form
