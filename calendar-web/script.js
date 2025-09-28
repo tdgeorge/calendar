@@ -11,16 +11,35 @@ const SCOPES = "https://www.googleapis.com/auth/calendar";
 // Store events by date for color coding
 let eventsByDate = {};
 
-const loginBtn = document.getElementById('login-btn');
-const loginSection = document.getElementById('login-section');
-const calendarSection = document.getElementById('calendar-section');
-const monthYear = document.getElementById('month-year');
-const calendarTable = document.getElementById('calendar-table');
-const eventsDiv = document.getElementById('events');
-const debugOutput = document.getElementById('debug-output');
-const clearDebugBtn = document.getElementById('clear-debug');
-const prevMonthBtn = document.getElementById('prev-month');
-const nextMonthBtn = document.getElementById('next-month');
+// DOM element references with null checks
+function getElement(id, required = true) {
+    const element = document.getElementById(id);
+    if (!element && required) {
+        debugLog(`❌ Required element not found: ${id}`, 'error');
+    }
+    return element;
+}
+
+// Helper function to safely update login button
+function updateLoginButton(text, onClick, disabled = false) {
+    if (loginBtn) {
+        loginBtn.textContent = text;
+        loginBtn.onclick = onClick;
+        loginBtn.disabled = disabled;
+    }
+}
+
+const loginBtn = getElement('login-btn');
+const loginSection = getElement('login-section');
+const userSection = getElement('user-section');
+const dashboard = getElement('dashboard');
+const monthYear = getElement('month-year');
+const calendarTable = getElement('calendar-table');
+const eventsDiv = getElement('events');
+const debugOutput = getElement('debug-output');
+const clearDebugBtn = getElement('clear-debug');
+const prevMonthBtn = getElement('prev-month');
+const nextMonthBtn = getElement('next-month');
 
 // Current date being displayed
 let currentDisplayDate = new Date();
@@ -44,30 +63,35 @@ function debugLog(message, type = 'info') {
 }
 
 // Clear debug console
-clearDebugBtn.onclick = () => {
-    debugOutput.textContent = '';
-};
+if (clearDebugBtn && debugOutput) {
+    clearDebugBtn.onclick = () => {
+        debugOutput.textContent = '';
+    };
+}
 
 // Navigation button handlers
-prevMonthBtn.onclick = () => {
-    currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1);
-    renderCalendar(currentDisplayDate);
-    if (accessToken) {
-        loadCalendarEventsForMonth(currentDisplayDate);
-    }
-};
+if (prevMonthBtn) {
+    prevMonthBtn.onclick = () => {
+        currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1);
+        renderCalendar(currentDisplayDate);
+        if (accessToken) {
+            loadCalendarEventsForMonth(currentDisplayDate);
+        }
+    };
+}
 
-nextMonthBtn.onclick = () => {
-    currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1);
-    renderCalendar(currentDisplayDate);
-    if (accessToken) {
-        loadCalendarEventsForMonth(currentDisplayDate);
-    }
-};
+if (nextMonthBtn) {
+    nextMonthBtn.onclick = () => {
+        currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1);
+        renderCalendar(currentDisplayDate);
+        if (accessToken) {
+            loadCalendarEventsForMonth(currentDisplayDate);
+        }
+    };
+}
 
-// Disable login button initially
-loginBtn.disabled = true;
-loginBtn.textContent = 'Loading...';
+// Initialize login button
+updateLoginButton('Loading...', null, true);
 
 debugLog('Calendar app initialized');
 
@@ -85,14 +109,14 @@ async function loadConfig() {
         
         if (!CLIENT_ID || !API_KEY) {
             debugLog('Missing CLIENT_ID or API_KEY from server config', 'error');
-            loginBtn.textContent = 'Config Error';
+            updateLoginButton('Config Error', null, true);
             return false;
         }
         
         return true;
     } catch (error) {
         debugLog(`Failed to load config: ${error.message}`, 'error');
-        loginBtn.textContent = 'Config Load Error';
+        updateLoginButton('Config Load Error', null, true);
         return false;
     }
 }
@@ -122,6 +146,11 @@ function gapiLoaded() {
 }
 
 function renderCalendar(date = currentDisplayDate) {
+    if (!monthYear || !calendarTable) {
+        debugLog('❌ Calendar elements not found, cannot render', 'error');
+        return;
+    }
+    
     const year = date.getFullYear();
     const month = date.getMonth();
     monthYear.textContent = date.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -149,11 +178,18 @@ function renderCalendar(date = currentDisplayDate) {
     calendarTable.innerHTML = html;
 }
 
-function showCalendar() {
-    loginSection.style.display = 'none';
-    calendarSection.style.display = 'block';
+async function showCalendar() {
+    if (loginSection) loginSection.style.display = 'none';
+    if (userSection) userSection.style.display = 'flex';
+    if (dashboard) dashboard.style.display = 'grid';
     currentDisplayDate = new Date(); // Reset to current month when showing calendar
     renderCalendar();
+    
+    // Load events for calendar coloring and initial display
+    if (accessToken) {
+        await loadCalendarEventsForMonth(currentDisplayDate);
+        showTodaysEvents(); // Show today's events after events are loaded
+    }
 }
 
 // Google API integration
@@ -229,7 +265,7 @@ async function initializeGapi() {
     
     if (!API_KEY) {
         debugLog('API Key is empty or undefined', 'error');
-        loginBtn.textContent = 'Missing API Key';
+        updateLoginButton('Missing API Key', null, true);
         return;
     }
     
@@ -252,11 +288,11 @@ async function initializeGapi() {
         
         debugLog('Google API client (GAPI) initialized successfully - no auth included');
         gapiInited = true;
-        maybeEnableButtons();
+        await maybeEnableButtons();
     } catch (error) {
         debugLog(`Error initializing Google API: ${error.message || error}`, 'error');
         debugLog(`Error details: ${JSON.stringify(error)}`, 'error');
-        loginBtn.textContent = 'API Init Error';
+        updateLoginButton('API Init Error', null, true);
     }
 }
 
@@ -272,11 +308,11 @@ function gisLoaded() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
-            callback: (response) => {
+            callback: async (response) => {
                 debugLog('GIS callback triggered');
                 if (response.error !== undefined) {
                     debugLog(`Token error: ${response.error}`, 'error');
-                    loginBtn.textContent = 'Auth Error';
+                    updateLoginButton('Auth Error', null, true);
                     return;
                 }
                 
@@ -295,9 +331,8 @@ function gisLoaded() {
                 });
                 
                 debugLog('Token set on gapi.client, showing calendar');
-                showCalendar();
+                await showCalendar();
                 loadCalendarEvents();
-                listUpcomingEvents();
             },
         });
         gisInited = true;
@@ -305,11 +340,11 @@ function gisLoaded() {
         maybeEnableButtons();
     } catch (error) {
         debugLog(`Error initializing GIS: ${error.message || error}`, 'error');
-        loginBtn.textContent = 'GIS Init Error';
+        updateLoginButton('GIS Init Error', null, true);
     }
 }
 
-function maybeEnableButtons() {
+async function maybeEnableButtons() {
     debugLog(`Checking if ready to enable buttons - GAPI: ${gapiInited}, GIS: ${gisInited}`);
     
     if (gapiInited && gisInited) {
@@ -328,36 +363,30 @@ function maybeEnableButtons() {
             });
             
             // Show calendar interface
-            showCalendar();
-            listUpcomingEvents();
+            await showCalendar();
             
             // Update login button to show sign out option
-            loginBtn.textContent = 'Sign Out';
-            loginBtn.onclick = handleSignoutClick;
-            loginBtn.disabled = false;
+            updateLoginButton('Sign Out', handleSignoutClick, false);
             
             // Show restoration message
             debugLog('Successfully restored authentication from stored token');
         } else {
             debugLog('No valid stored token, showing login button');
-            loginBtn.disabled = false;
-            loginBtn.textContent = 'Login with Google';
-            loginBtn.onclick = handleAuthClick;
+            updateLoginButton('Login with Google', handleAuthClick, false);
         }
     } else {
         debugLog(`Still waiting - GAPI: ${gapiInited ? 'Ready' : 'Loading'}, GIS: ${gisInited ? 'Ready' : 'Loading'}`);
     }
 }
 
-function handleAuthClick() {
+async function handleAuthClick() {
     debugLog('Login/Auth button clicked');
     
     // Check if user is already authenticated (this should not happen with proper UI state)
     if (accessToken && gapi.client.getToken()) {
         debugLog('User already authenticated, showing calendar');
-        showCalendar();
+        await showCalendar();
         loadCalendarEvents();
-        listUpcomingEvents();
         return;
     }
     
@@ -482,7 +511,7 @@ async function listUpcomingEvents() {
             const eventDate = new Date(when).toLocaleDateString();
             const eventTime = event.start.dateTime ? new Date(event.start.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'All day';
             
-            html += `<li class="event-item" onclick="editEvent('${event.id}')" data-event-id="${event.id}">`;
+            html += `<li class="event-item" data-event-id="${event.id}" style="cursor: pointer;">`;
             html += `<strong>${event.summary}</strong><br>`;
             html += `📅 ${eventDate} ${eventTime}`;
             if (event.description) {
@@ -502,40 +531,68 @@ async function listUpcomingEvents() {
     }
 }
 
+function showTodaysEvents() {
+    debugLog('Showing today\'s events...');
+    
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    
+    // Show today's events using the existing function
+    showDayEvents(todayStr);
+}
+
 function showDayEvents(dateStr) {
     debugLog(`Clicked on date: ${dateStr}`);
     const dayEvents = eventsByDate[dateStr] || [];
     
+    // Store the selected date for creating new events
+    window.selectedDate = dateStr;
+    
+    let html = `<b>Events for ${dateStr}:</b>`;
+    
+    // Add create event button
+    html += `<div style="margin: 1rem 0;"><button class="btn btn-primary" onclick="createNewEvent()" style="width: 100%; padding: 0.75rem;">+ Create Event</button></div>`;
+    
     if (dayEvents.length === 0) {
-        eventsDiv.innerHTML = `<b>Events for ${dateStr}:</b><p>No events scheduled</p>`;
-        return;
+        html += `<p>No events scheduled</p>`;
+    } else {
+        html += `<ul>`;
+        dayEvents.forEach(event => {
+            // Use the dateStr directly to avoid timezone conversion issues
+            const displayDate = new Date(dateStr + 'T00:00:00').toLocaleDateString();
+            const eventTime = event.start.dateTime ? 
+                new Date(event.start.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
+                'All day';
+            
+            // Log event ID for debugging
+            debugLog(`🆔 Adding event to list: ${event.summary} (ID: ${event.id})`);
+            
+            // Use data attribute for event ID to avoid onclick issues with special characters
+            html += `<li class="event-item" data-event-id="${event.id}" style="cursor: pointer;">`;
+            html += `<strong>${event.summary}</strong><br>`;
+            html += `📅 ${displayDate} ${eventTime}`;
+            if (event.description) {
+                html += `<br>📝 ${event.description.substring(0, 50)}${event.description.length > 50 ? '...' : ''}`;
+            }
+            if (event.location) {
+                html += `<br>📍 ${event.location}`;
+            }
+            html += `</li>`;
+        });
+        html += '</ul>';
     }
     
-    let html = `<b>Events for ${dateStr}:</b><ul>`;
-    dayEvents.forEach(event => {
-        const eventDate = new Date(dateStr).toLocaleDateString();
-        const eventTime = event.start.dateTime ? 
-            new Date(event.start.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
-            'All day';
-        
-        // Make events clickable just like in listUpcomingEvents
-        html += `<li class="event-item" onclick="editEvent('${event.id}')" data-event-id="${event.id}">`;
-        html += `<strong>${event.summary}</strong><br>`;
-        html += `📅 ${eventDate} ${eventTime}`;
-        if (event.description) {
-            html += `<br>📝 ${event.description.substring(0, 50)}${event.description.length > 50 ? '...' : ''}`;
-        }
-        if (event.location) {
-            html += `<br>📍 ${event.location}`;
-        }
-        html += `</li>`;
-    });
-    html += '</ul>';
-    eventsDiv.innerHTML = html;
+    if (eventsDiv) {
+        eventsDiv.innerHTML = html;
+        debugLog(`📝 Updated events container HTML. Container ID: ${eventsDiv.id}`);
+    } else {
+        debugLog('❌ Events container not found!', 'error');
+    }
     
     // Store events for editing (just like in listUpcomingEvents)
     window.currentEvents = dayEvents;
-    debugLog(`Displayed ${dayEvents.length} events for ${dateStr}`);
+    debugLog(`📊 Stored ${dayEvents.length} events in window.currentEvents for ${dateStr}`);
 }
 
 function handleSignoutClick() {
@@ -553,11 +610,11 @@ function handleSignoutClick() {
         clearTokenStorage();
         
         // Reset UI
-        loginSection.style.display = 'block';
-        calendarSection.style.display = 'none';
-        eventsDiv.innerHTML = '';
-        loginBtn.textContent = 'Login with Google';
-        loginBtn.onclick = handleAuthClick;
+        if (loginSection) loginSection.style.display = 'block';
+        if (dashboard) dashboard.style.display = 'none';
+        if (userSection) userSection.style.display = 'none';
+        if (eventsDiv) eventsDiv.innerHTML = '';
+        updateLoginButton('Login with Google', handleAuthClick, false);
         
         debugLog('User signed out successfully, storage cleared');
     }
@@ -565,170 +622,256 @@ function handleSignoutClick() {
 
 // Event editing functionality
 let currentEditingEvent = null;
+let isCreatingNewEvent = false;
+
+function createNewEvent() {
+    debugLog(`Creating new event for ${window.selectedDate}`);
+    
+    if (!window.selectedDate) {
+        debugLog('No date selected for new event', 'error');
+        return;
+    }
+    
+    isCreatingNewEvent = true;
+    currentEditingEvent = null;
+    
+    // Create a blank event object for the selected date
+    const newEvent = {
+        summary: '',
+        description: '',
+        start: {
+            date: window.selectedDate
+        },
+        end: {
+            date: window.selectedDate
+        }
+    };
+    
+    showEditForm(newEvent, true);
+}
 
 function editEvent(eventId) {
-    debugLog(`Edit event clicked: ${eventId}`);
+    debugLog(`🖱️ Edit event clicked: ${eventId}`);
+    debugLog(`📊 Current events available: ${window.currentEvents ? window.currentEvents.length : 'none'}`);
     
     if (!window.currentEvents) {
-        debugLog('No events available for editing', 'error');
+        debugLog('❌ No events available for editing', 'error');
         return;
     }
     
     const event = window.currentEvents.find(e => e.id === eventId);
     if (!event) {
-        debugLog(`Event not found: ${eventId}`, 'error');
+        debugLog(`❌ Event not found: ${eventId}`, 'error');
+        debugLog(`Available event IDs: ${window.currentEvents.map(e => e.id).join(', ')}`);
         return;
     }
     
+    // Set editing state
+    isCreatingNewEvent = false;
     currentEditingEvent = event;
-    showEditForm(event);
+    
+    debugLog(`✅ Found event: ${event.summary}, calling showEditForm`);
+    
+    // Show the edit form
+    showEditForm(event, false);
 }
 
-function showEditForm(event) {
-    debugLog(`Showing edit form for event: ${event.summary}`);
-    
-    // Populate form fields
-    document.getElementById('edit-title').value = event.summary || '';
-    document.getElementById('edit-description').value = event.description || '';
-    
-    const isAllDay = !event.start.dateTime;
-    document.getElementById('edit-all-day').checked = isAllDay;
-    
-    if (isAllDay) {
-        // All day event
-        const startDate = event.start.date;
-        const endDate = event.end.date;
-        
-        document.getElementById('edit-start-date').value = startDate;
-        document.getElementById('edit-end-date').value = endDate;
-        document.getElementById('edit-start-time').value = '';
-        document.getElementById('edit-end-time').value = '';
-        
-        // Hide time fields for all-day events
-        document.getElementById('edit-start-time').style.display = 'none';
-        document.getElementById('edit-end-time').style.display = 'none';
-        document.querySelector('label[for="edit-start-time"]').style.display = 'none';
-        document.querySelector('label[for="edit-end-time"]').style.display = 'none';
-    } else {
-        // Timed event
-        const startDateTime = new Date(event.start.dateTime);
-        const endDateTime = new Date(event.end.dateTime);
-        
-        document.getElementById('edit-start-date').value = startDateTime.toISOString().split('T')[0];
-        document.getElementById('edit-end-date').value = endDateTime.toISOString().split('T')[0];
-        document.getElementById('edit-start-time').value = startDateTime.toTimeString().substring(0, 5);
-        document.getElementById('edit-end-time').value = endDateTime.toTimeString().substring(0, 5);
-        
-        // Show time fields for timed events
-        document.getElementById('edit-start-time').style.display = 'block';
-        document.getElementById('edit-end-time').style.display = 'block';
-        document.querySelector('label[for="edit-start-time"]').style.display = 'block';
-        document.querySelector('label[for="edit-end-time"]').style.display = 'block';
-    }
+function showEditForm(event, isNew = false) {
+        debugLog(isNew ? `Showing form for new event on ${window.selectedDate}` : `Showing edit form for event: ${event.summary}`);
+
+        // Define all input and label variables at the top
+        const titleInput = document.getElementById('edit-title');
+        const descInput = document.getElementById('edit-description');
+        const startDateInput = document.getElementById('edit-start-date');
+        const endDateInput = document.getElementById('edit-end-date');
+        const startTimeInput = document.getElementById('edit-start-time');
+        const endTimeInput = document.getElementById('edit-end-time');
+        const startTimeLabel = document.querySelector('label[for="edit-start-time"]');
+        const endTimeLabel = document.querySelector('label[for="edit-end-time"]');
+
+        if (titleInput) titleInput.value = event.summary || '';
+        if (descInput) descInput.value = event.description || '';
+
+        const isAllDay = !event.start.dateTime;
+        const allDayInput = document.getElementById('edit-all-day');
+        if (allDayInput) allDayInput.checked = isAllDay;
+
+        if (isAllDay) {
+            // All day event
+            const startDate = event.start.date;
+            const endDate = event.end.date;
+            if (startDateInput) startDateInput.value = startDate;
+            if (endDateInput) endDateInput.value = endDate;
+            if (startTimeInput) startTimeInput.value = '';
+            if (endTimeInput) endTimeInput.value = '';
+            // Hide time fields for all-day events
+            if (startTimeInput) startTimeInput.style.display = 'none';
+            if (endTimeInput) endTimeInput.style.display = 'none';
+            if (startTimeLabel) startTimeLabel.style.display = 'none';
+            if (endTimeLabel) endTimeLabel.style.display = 'none';
+        } else {
+            // Timed event
+            const startDateTime = new Date(event.start.dateTime);
+            const endDateTime = new Date(event.end.dateTime);
+            if (startDateInput) startDateInput.value = startDateTime.toISOString().split('T')[0];
+            if (endDateInput) endDateInput.value = endDateTime.toISOString().split('T')[0];
+            if (startTimeInput) startTimeInput.value = startDateTime.toTimeString().substring(0, 5);
+            if (endTimeInput) endTimeInput.value = endDateTime.toTimeString().substring(0, 5);
+            // Show time fields for timed events
+            if (startTimeInput) startTimeInput.style.display = 'block';
+            if (endTimeInput) endTimeInput.style.display = 'block';
+            if (startTimeLabel) startTimeLabel.style.display = 'block';
+            if (endTimeLabel) endTimeLabel.style.display = 'block';
+        }
+
+        // Update form title and save button text
+        const editTitle = document.querySelector('#edit-section h3');
+        const saveBtn = document.getElementById('save-event-btn');
+        if (isNew) {
+            if (editTitle) editTitle.textContent = 'Create New Event';
+            if (saveBtn) saveBtn.textContent = 'Create Event';
+        } else {
+            if (editTitle) editTitle.textContent = 'Edit Event';
+            if (saveBtn) saveBtn.textContent = 'Save Changes';
+        }
     
     // Show edit section
-    document.getElementById('edit-section').style.display = 'block';
-    document.getElementById('edit-title').focus();
+        const editSection = document.getElementById('edit-section');
+        if (editSection) {
+            editSection.style.display = 'block';
+            debugLog(`📝 Edit panel made visible for ${isNew ? 'new' : 'existing'} event`);
+        } else {
+            debugLog('❌ Edit section element not found', 'error');
+        }
+        if (titleInput) titleInput.focus();
 }
 
 function hideEditForm() {
-    document.getElementById('edit-section').style.display = 'none';
+const editSection = document.getElementById('edit-section');
+if (editSection) editSection.style.display = 'none';
     currentEditingEvent = null;
+    isCreatingNewEvent = false;
     debugLog('Edit form hidden');
 }
 
 async function saveEventChanges() {
-    if (!currentEditingEvent) {
-        debugLog('No event selected for editing', 'error');
+    if (!currentEditingEvent && !isCreatingNewEvent) {
+        debugLog('No event selected for editing or creating', 'error');
         return;
     }
     
-    debugLog('Saving event changes...');
+    debugLog(isCreatingNewEvent ? 'Creating new event...' : 'Saving event changes...');
     
     // Disable save button to prevent double-clicks
-    const saveBtn = document.getElementById('save-event-btn');
+const saveBtn = document.getElementById('save-event-btn');
+if (saveBtn) {
     saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving...';
+    saveBtn.textContent = isCreatingNewEvent ? 'Creating...' : 'Saving...';
+}
     
     try {
         // Get form values
-        const title = document.getElementById('edit-title').value.trim();
-        const description = document.getElementById('edit-description').value.trim();
-        const isAllDay = document.getElementById('edit-all-day').checked;
-        const startDate = document.getElementById('edit-start-date').value;
-        const endDate = document.getElementById('edit-end-date').value;
-        const startTime = document.getElementById('edit-start-time').value;
-        const endTime = document.getElementById('edit-end-time').value;
+    const titleInput = document.getElementById('edit-title');
+    const descInput = document.getElementById('edit-description');
+    const allDayInput = document.getElementById('edit-all-day');
+    const startDateInput = document.getElementById('edit-start-date');
+    const endDateInput = document.getElementById('edit-end-date');
+    const startTimeInput = document.getElementById('edit-start-time');
+    const endTimeInput = document.getElementById('edit-end-time');
+    const title = titleInput ? titleInput.value.trim() : '';
+    const description = descInput ? descInput.value.trim() : '';
+    const isAllDay = allDayInput ? allDayInput.checked : false;
+    const startDate = startDateInput ? startDateInput.value : '';
+    const endDate = endDateInput ? endDateInput.value : '';
+    const startTime = startTimeInput ? startTimeInput.value : '';
+    const endTime = endTimeInput ? endTimeInput.value : '';
         
         if (!title) {
-            alert('Title is required');
+            debugLog('❌ Title is required', 'error');
             return;
         }
         
         if (!startDate) {
-            alert('Start date is required');
+            debugLog('❌ Start date is required', 'error');
             return;
         }
         
         if (!isAllDay && (!startTime || !endTime)) {
-            alert('Start and end times are required for timed events');
+            debugLog('❌ Start and end times are required for timed events', 'error');
             return;
         }
         
-        // Build updated event object
-        const updatedEvent = {
-            id: currentEditingEvent.id,
+        // Build event object
+        const eventData = {
             summary: title,
             description: description
         };
         
         if (isAllDay) {
-            updatedEvent.start = { date: startDate };
-            updatedEvent.end = { date: endDate };
+            eventData.start = { date: startDate };
+            eventData.end = { date: endDate };
         } else {
             const startDateTime = new Date(`${startDate}T${startTime}`);
             const endDateTime = new Date(`${endDate}T${endTime}`);
             
-            updatedEvent.start = { dateTime: startDateTime.toISOString() };
-            updatedEvent.end = { dateTime: endDateTime.toISOString() };
+            eventData.start = { dateTime: startDateTime.toISOString() };
+            eventData.end = { dateTime: endDateTime.toISOString() };
         }
         
-        debugLog(`Updating event: ${JSON.stringify(updatedEvent)}`);
+        let response;
         
-        // Make API call to update event
-        const response = await gapi.client.calendar.events.update({
-            calendarId: 'primary',
-            eventId: currentEditingEvent.id,
-            resource: updatedEvent
-        });
+        if (isCreatingNewEvent) {
+            debugLog(`Creating new event: ${JSON.stringify(eventData)}`);
+            
+            // Make API call to create event
+            response = await gapi.client.calendar.events.insert({
+                calendarId: 'primary',
+                resource: eventData
+            });
+            
+            debugLog('Event created successfully');
+        } else {
+            eventData.id = currentEditingEvent.id;
+            debugLog(`Updating event: ${JSON.stringify(eventData)}`);
+            
+            // Make API call to update event
+            response = await gapi.client.calendar.events.update({
+                calendarId: 'primary',
+                eventId: currentEditingEvent.id,
+                resource: eventData
+            });
+            
+            debugLog('Event updated successfully');
+        }
         
-        debugLog('Event updated successfully');
-        
-        // Refresh events list
-        await listUpcomingEvents();
+        // Refresh events list and calendar
+        await loadCalendarEventsForMonth(currentDisplayDate);
+        showTodaysEvents();
         
         // Hide edit form
         hideEditForm();
         
-        // Show success message
-        alert('Event updated successfully!');
+        // Log success message instead of alert
+        debugLog(isCreatingNewEvent ? '✅ Event created successfully!' : '✅ Event updated successfully!');
         
     } catch (error) {
-        debugLog(`Error updating event: ${error.message || error}`, 'error');
+        debugLog(`Error ${isCreatingNewEvent ? 'creating' : 'updating'} event: ${error.message || error}`, 'error');
         
         // Handle authentication errors
         if (error.status === 401 || error.status === 403) {
             debugLog('Authentication expired during event save, clearing stored token');
             clearTokenStorage();
-            alert('Authentication expired. Please sign in again.');
+            debugLog('⚠️ Authentication expired. Please sign in again.', 'warn');
             handleSignoutClick();
         } else {
-            alert(`Failed to update event: ${error.message || 'Unknown error'}`);
+            debugLog(`❌ Failed to ${isCreatingNewEvent ? 'create' : 'update'} event: ${error.message || 'Unknown error'}`, 'error');
         }
     } finally {
         // Re-enable save button
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save Changes';
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = isCreatingNewEvent ? 'Create Event' : 'Save Changes';
+        }
     }
 }
 
@@ -739,6 +882,27 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Cancel button
     document.getElementById('cancel-edit-btn').addEventListener('click', hideEditForm);
+    
+    // Close button (X)
+    document.getElementById('close-edit-btn').addEventListener('click', hideEditForm);
+    
+    // Event delegation for clicking on event items
+    document.addEventListener('click', (e) => {
+        debugLog(`🖱️ Click detected on: ${e.target.tagName} with classes: ${e.target.className}`);
+        
+        const eventItem = e.target.closest('.event-item[data-event-id]');
+        if (eventItem) {
+            const eventId = eventItem.getAttribute('data-event-id');
+            debugLog(`🎯 Event item clicked via delegation: ${eventId}`);
+            editEvent(eventId);
+        } else {
+            // Check if click was on event-related element
+            if (e.target.classList.contains('event-item') || e.target.closest('.event-item')) {
+                debugLog(`⚠️ Click on event item but no data-event-id found`);
+                debugLog(`Element: ${e.target.outerHTML.substring(0, 200)}...`);
+            }
+        }
+    });
     
     // All-day checkbox toggle
     document.getElementById('edit-all-day').addEventListener('change', (e) => {

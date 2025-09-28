@@ -7,65 +7,101 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="login-section">
-        <button id="login-btn">Login with Google</button>
-    </div>
-    <div id="calendar-section" style="display:none;">
-        <button id="signout-btn" onclick="handleSignoutClick()">Sign Out</button>
-        <div id="calendar-header">
-            <button id="prev-month" class="nav-btn">‹</button>
-            <h2 id="month-year"></h2>
-            <button id="next-month" class="nav-btn">›</button>
+    <!-- Header -->
+    <header class="app-header">
+        <h1 class="app-title">📅 Calendar</h1>
+        <div class="header-actions">
+            <div id="login-section">
+                <button id="login-btn" class="btn btn-primary">Login with Google</button>
+            </div>
+            <div id="user-section" style="display:none;">
+                <button id="signout-btn" class="btn btn-secondary" onclick="handleSignoutClick()">Sign Out</button>
+            </div>
         </div>
-        <table id="calendar-table"></table>
-        <div id="events"></div>
-        
-        <!-- Event Edit Form -->
-        <div id="edit-section" style="display:none;">
-            <h3>Edit Event</h3>
-            <form id="event-edit-form">
-                <div class="form-group">
-                    <label for="edit-title">Title:</label>
-                    <input type="text" id="edit-title" name="title" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="edit-description">Description:</label>
-                    <textarea id="edit-description" name="description" rows="3"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="edit-start-date">Start Date:</label>
-                    <input type="date" id="edit-start-date" name="startDate" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="edit-start-time">Start Time:</label>
-                    <input type="time" id="edit-start-time" name="startTime">
-                </div>
-                
-                <div class="form-group">
-                    <label for="edit-end-date">End Date:</label>
-                    <input type="date" id="edit-end-date" name="endDate" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="edit-end-time">End Time:</label>
-                    <input type="time" id="edit-end-time" name="endTime">
-                </div>
-                
-                <div class="form-group">
-                    <input type="checkbox" id="edit-all-day" name="allDay">
-                    <label for="edit-all-day">All Day Event</label>
-                </div>
-                
-                <div class="form-buttons">
-                    <button type="button" id="save-event-btn">Save Changes</button>
-                    <button type="button" id="cancel-edit-btn">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <main id="dashboard" class="dashboard" style="display:none;">
+        <!-- Left Column: Calendar -->
+        <section class="calendar-panel">
+            <div class="panel-header">
+                <button id="prev-month" class="nav-btn">‹</button>
+                <h2 id="month-year"></h2>
+                <button id="next-month" class="nav-btn">›</button>
+            </div>
+            <div class="calendar-container">
+                <table id="calendar-table"></table>
+            </div>
+        </section>
+
+        <!-- Middle Column: Events -->
+        <section class="events-panel">
+            <div class="panel-header">
+                <h3 id="events-title">Upcoming Events</h3>
+            </div>
+            <div class="events-container">
+                <div id="events"></div>
+            </div>
+        </section>
+
+        <!-- Right Column: Event Editor -->
+        <section class="editor-panel" id="edit-section" style="display:none;">
+            <div class="panel-header">
+                <h3>Edit Event</h3>
+                <button type="button" id="close-edit-btn" class="close-btn">×</button>
+            </div>
+            <div class="editor-container">
+                <form id="event-edit-form">
+                    <div class="form-group">
+                        <label for="edit-title">Title</label>
+                        <input type="text" id="edit-title" name="title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-description">Description</label>
+                        <textarea id="edit-description" name="description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-start-date">Start Date</label>
+                            <input type="date" id="edit-start-date" name="startDate" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="edit-start-time">Start Time</label>
+                            <input type="time" id="edit-start-time" name="startTime">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-end-date">End Date</label>
+                            <input type="date" id="edit-end-date" name="endDate" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="edit-end-time">End Time</label>
+                            <input type="time" id="edit-end-time" name="endTime">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="edit-all-day" name="allDay">
+                            <span class="checkmark"></span>
+                            All Day Event
+                        </label>
+                    </div>
+                    
+                    <div class="form-buttons">
+                        <button type="button" id="save-event-btn" class="btn btn-primary">Save Changes</button>
+                        <button type="button" id="cancel-edit-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
     <div id="debug-console">
         <h3 id="debug-console-toggle" onclick="toggleDebugConsole()">Debug Console <span id="debug-toggle-icon">▲</span></h3>
         <div id="debug-panel" style="display:none;">

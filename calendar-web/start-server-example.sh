@@ -9,6 +9,8 @@
 # 3. Run: chmod +x start-server.sh
 # 4. Run: ./start-server.sh [port]
 
+cd $(dirname "$0")
+
 # Set your Google OAuth2 credentials here
 export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 export GOOGLE_API_KEY="AIzaSyBxxxxxxxxxxxxxxxxxxxxx"
