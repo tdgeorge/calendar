@@ -1100,12 +1100,28 @@ async function updateEventDateTime(eventId, targetInfo) {
         // Create updated event data
         const updatedEvent = { ...event };
         
-        if (targetInfo.allDay) {
-            // Move to all-day event
+        if (targetInfo.allDay && !event.start.dateTime) {
+            // Moving all-day event to another date - keep as all-day
             updatedEvent.start = { date: targetInfo.date };
             updatedEvent.end = { date: targetInfo.date };
+        } else if (targetInfo.allDay && event.start.dateTime) {
+            // Moving timed event to month view - preserve original times but change date
+            const originalStart = new Date(event.start.dateTime);
+            const originalEnd = new Date(event.end.dateTime);
+            
+            const startTime = `${String(originalStart.getHours()).padStart(2, '0')}:${String(originalStart.getMinutes()).padStart(2, '0')}:00`;
+            const endTime = `${String(originalEnd.getHours()).padStart(2, '0')}:${String(originalEnd.getMinutes()).padStart(2, '0')}:00`;
+            
+            updatedEvent.start = { 
+                dateTime: `${targetInfo.date}T${startTime}`,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+            updatedEvent.end = { 
+                dateTime: `${targetInfo.date}T${endTime}`,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
         } else {
-            // Move to specific time
+            // Move to specific time slot
             const startTime = `${String(targetInfo.hour).padStart(2, '0')}:${String(targetInfo.minutes || 0).padStart(2, '0')}:00`;
             const endHour = (targetInfo.hour || 0) + 1;
             const endTime = `${String(endHour).padStart(2, '0')}:${String(targetInfo.minutes || 0).padStart(2, '0')}:00`;
@@ -1766,6 +1782,8 @@ async function loadCalendarEventsForMonth(date) {
     }
     
     debugLog(`Loading calendar events for ${rangeDescription}...`);
+    debugLog(`📍 Date range: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+    debugLog(`🎯 Current view mode: ${currentViewMode}`);
     
     // Check if we have an access token
     if (!accessToken) {
@@ -1779,26 +1797,57 @@ async function loadCalendarEventsForMonth(date) {
     });
     
     try {
+        // Add appropriate buffer based on view mode to ensure all events are loaded
+        let bufferStart, bufferEnd;
+        
+        if (currentViewMode === VIEW_MODES.DAY) {
+            // Day view: 1 full day buffer before and after
+            bufferStart = new Date(startDate.getTime() - 24 * 60 * 60 * 1000); // 1 day before
+            bufferEnd = new Date(endDate.getTime() + 2 * 24 * 60 * 60 * 1000); // 2 days after (1 day + original day)
+            debugLog(`📅 Day view buffer: 1 day before and after`);
+        } else if (currentViewMode === VIEW_MODES.WEEK) {
+            // Week view: 1 full week buffer before and after
+            bufferStart = new Date(startDate.getTime() - 7 * 24 * 60 * 60 * 1000); // 1 week before
+            bufferEnd = new Date(endDate.getTime() + 8 * 24 * 60 * 60 * 1000); // 1 week + 1 day after
+            debugLog(`📊 Week view buffer: 1 week before and after`);
+        } else {
+            // Month view: 1 full week buffer before and after
+            bufferStart = new Date(startDate.getTime() - 7 * 24 * 60 * 60 * 1000); // 1 week before
+            bufferEnd = new Date(endDate.getTime() + 8 * 24 * 60 * 60 * 1000); // 1 week + 1 day after
+            debugLog(`📅 Month view buffer: 1 week before and after`);
+        }
+        
         const request = {
             'calendarId': 'primary',
-            'timeMin': startDate.toISOString(),
-            'timeMax': new Date(endDate.getTime() + 24 * 60 * 60 * 1000).toISOString(), // Add 1 day to include end date
+            'timeMin': bufferStart.toISOString(),
+            'timeMax': bufferEnd.toISOString(),
             'showDeleted': false,
             'singleEvents': true,
             'orderBy': 'startTime'
         };
         
+        debugLog(`🔍 API Request: ${bufferStart.toISOString()} to ${bufferEnd.toISOString()}`);
+        
         const response = await gapi.client.calendar.events.list(request);
         const events = response.result.items;
         debugLog(`Found ${events.length} events for ${rangeDescription}`);
         
-        // Clear existing events for the date range and add new ones
-        const startDateStr = formatDateForCalendar(startDate);
-        const endDateStr = formatDateForCalendar(endDate);
+        // Log each event for debugging
+        events.forEach((event, index) => {
+            const eventStart = event.start.date || event.start.dateTime;
+            debugLog(`  Event ${index + 1}: "${event.summary}" starts ${eventStart}`);
+        });
         
-        // Remove events from eventsByDate that belong to this date range
+        // Clear existing events for the BUFFERED date range to ensure consistency
+        const bufferStartStr = formatDateForCalendar(bufferStart);
+        const bufferEndStr = formatDateForCalendar(bufferEnd);
+        
+        debugLog(`🧹 Clearing events from ${bufferStartStr} to ${bufferEndStr}`);
+        
+        // Remove events from eventsByDate that belong to the buffered date range
         Object.keys(eventsByDate).forEach(dateKey => {
-            if (dateKey >= startDateStr && dateKey <= endDateStr) {
+            if (dateKey >= bufferStartStr && dateKey <= bufferEndStr) {
+                debugLog(`  Clearing events for date: ${dateKey}`);
                 delete eventsByDate[dateKey];
             }
         });
@@ -1807,21 +1856,30 @@ async function loadCalendarEventsForMonth(date) {
         allEvents = [...events];
         
         // Add new events with proper timezone handling
+        debugLog(`📅 Adding ${events.length} events to eventsByDate...`);
         events.forEach(event => {
             let eventDate;
             if (event.start.date) {
                 // All-day event - use date as-is
                 eventDate = event.start.date;
+                debugLog(`  All-day event "${event.summary}" on ${eventDate}`);
             } else {
                 // Timed event - get date in local timezone
                 const startDateTime = new Date(event.start.dateTime);
                 eventDate = formatDateForCalendar(startDateTime);
+                debugLog(`  Timed event "${event.summary}" on ${eventDate} at ${startDateTime.toLocaleTimeString()}`);
             }
             
             if (!eventsByDate[eventDate]) {
                 eventsByDate[eventDate] = [];
             }
             eventsByDate[eventDate].push(event);
+        });
+        
+        // Log final eventsByDate state
+        debugLog(`📊 Final eventsByDate state:`);
+        Object.keys(eventsByDate).forEach(dateKey => {
+            debugLog(`  ${dateKey}: ${eventsByDate[dateKey].length} events`);
         });
         
         // Re-render current view with event indicators
