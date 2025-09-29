@@ -865,6 +865,76 @@ function debugLog(message, type = 'info') {
     }
 }
 
+// Scroll position preservation utilities
+function saveScrollPosition() {
+    const scrollableElements = {
+        weekContent: document.querySelector('.week-content'),
+        dayContent: document.querySelector('.day-content'),
+        calendarTable: document.querySelector('#calendar-table')
+    };
+    
+    const scrollPosition = {};
+    
+    Object.keys(scrollableElements).forEach(key => {
+        const element = scrollableElements[key];
+        if (element) {
+            scrollPosition[key] = {
+                scrollTop: element.scrollTop,
+                scrollLeft: element.scrollLeft
+            };
+            debugLog(`📜 Saved ${key} scroll position: ${element.scrollTop}px`);
+        }
+    });
+    
+    return scrollPosition;
+}
+
+function restoreScrollPosition(scrollPosition) {
+    if (!scrollPosition) return;
+    
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    const tryRestore = () => {
+        attempts++;
+        let restored = false;
+        
+        Object.keys(scrollPosition).forEach(key => {
+            let selector;
+            if (key === 'weekContent') {
+                selector = '.week-content';
+            } else if (key === 'dayContent') {
+                selector = '.day-content';
+            } else if (key === 'calendarTable') {
+                selector = '#calendar-table';
+            }
+            
+            const element = document.querySelector(selector);
+            if (element && scrollPosition[key]) {
+                element.scrollTop = scrollPosition[key].scrollTop;
+                element.scrollLeft = scrollPosition[key].scrollLeft;
+                debugLog(`📜 Restored ${key} scroll position: ${scrollPosition[key].scrollTop}px (attempt ${attempts})`);
+                restored = true;
+            } else if (scrollPosition[key]) {
+                debugLog(`⚠️ Element not found for ${key} (selector: ${selector})`, 'warn');
+            }
+        });
+        
+        // If restoration failed and we haven't exceeded max attempts, try again
+        if (!restored && attempts < maxAttempts) {
+            debugLog(`⏰ Scroll restoration failed, retrying in ${attempts * 50}ms (attempt ${attempts + 1}/${maxAttempts})`);
+            setTimeout(tryRestore, attempts * 50);
+        } else if (restored) {
+            debugLog(`✅ Scroll position restored successfully after ${attempts} attempts`);
+        } else {
+            debugLog(`❌ Failed to restore scroll position after ${maxAttempts} attempts`, 'warn');
+        }
+    };
+    
+    // Start with a small delay
+    setTimeout(tryRestore, 100);
+}
+
 // Drag & Drop Core Functions
 function initializeDragAndDrop() {
     debugLog('🎯 Initializing drag & drop system');
@@ -1109,29 +1179,37 @@ async function updateEventDateTime(eventId, targetInfo) {
             const originalStart = new Date(event.start.dateTime);
             const originalEnd = new Date(event.end.dateTime);
             
-            const startTime = `${String(originalStart.getHours()).padStart(2, '0')}:${String(originalStart.getMinutes()).padStart(2, '0')}:00`;
-            const endTime = `${String(originalEnd.getHours()).padStart(2, '0')}:${String(originalEnd.getMinutes()).padStart(2, '0')}:00`;
+            // Parse target date and create local datetime objects with original times
+            const [year, month, day] = targetInfo.date.split('-').map(Number);
+            const newStartDateTime = new Date(year, month - 1, day, originalStart.getHours(), originalStart.getMinutes(), originalStart.getSeconds());
+            const newEndDateTime = new Date(year, month - 1, day, originalEnd.getHours(), originalEnd.getMinutes(), originalEnd.getSeconds());
+            
+            debugLog(`🕐 Preserving times: ${newStartDateTime.toLocaleString()} to ${newEndDateTime.toLocaleString()}`);
             
             updatedEvent.start = { 
-                dateTime: `${targetInfo.date}T${startTime}`,
+                dateTime: newStartDateTime.toISOString(),
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
             };
             updatedEvent.end = { 
-                dateTime: `${targetInfo.date}T${endTime}`,
+                dateTime: newEndDateTime.toISOString(),
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
             };
         } else {
-            // Move to specific time slot
-            const startTime = `${String(targetInfo.hour).padStart(2, '0')}:${String(targetInfo.minutes || 0).padStart(2, '0')}:00`;
-            const endHour = (targetInfo.hour || 0) + 1;
-            const endTime = `${String(endHour).padStart(2, '0')}:${String(targetInfo.minutes || 0).padStart(2, '0')}:00`;
+            // Move to specific time slot - properly handle local timezone
+            const [year, month, day] = targetInfo.date.split('-').map(Number);
+            
+            // Create proper local datetime objects
+            const startDateTime = new Date(year, month - 1, day, targetInfo.hour, targetInfo.minutes || 0, 0);
+            const endDateTime = new Date(year, month - 1, day, targetInfo.hour + 1, targetInfo.minutes || 0, 0);
+            
+            debugLog(`🕐 Creating local datetime: ${startDateTime.toLocaleString()} to ${endDateTime.toLocaleString()}`);
             
             updatedEvent.start = { 
-                dateTime: `${targetInfo.date}T${startTime}`,
+                dateTime: startDateTime.toISOString(),
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
             };
             updatedEvent.end = { 
-                dateTime: `${targetInfo.date}T${endTime}`,
+                dateTime: endDateTime.toISOString(),
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
             };
         }
@@ -1149,6 +1227,9 @@ async function updateEventDateTime(eventId, targetInfo) {
             // Show success feedback
             showDragFeedback('✅ Event moved successfully!', 'success');
             
+            // Save scroll position before refreshing
+            const scrollPosition = saveScrollPosition();
+            
             // Refresh the current view
             await loadCalendarEventsForMonth(currentDisplayDate);
             renderCurrentView();
@@ -1158,6 +1239,9 @@ async function updateEventDateTime(eventId, targetInfo) {
                 debugLog(`📅 Switching events panel to show events for ${targetInfo.date}`);
                 showDayEvents(targetInfo.date);
             }
+            
+            // Restore scroll position after everything is complete
+            restoreScrollPosition(scrollPosition);
             
         } else {
             debugLog(`❌ No access token available`, 'error');
@@ -1883,6 +1967,8 @@ async function loadCalendarEventsForMonth(date) {
         });
         
         // Re-render current view with event indicators
+        // Note: Don't save/restore scroll here as this is called during normal navigation
+        // Only preserve scroll during drag & drop operations
         renderCurrentView();
         
     } catch (err) {
